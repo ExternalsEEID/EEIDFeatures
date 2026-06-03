@@ -1,0 +1,2618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Microsoft Entra External ID Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<!-- DIAGRAM STYLES -->
+<style>
+/* ══ Review system ══ */
+.mode-badge-private{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;font-weight:600;padding:3px 9px;border-radius:20px;background:#f59e0b15;border:1px solid #f59e0b40;color:#f59e0b;}
+.mode-badge-shared{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;font-weight:600;padding:3px 9px;border-radius:20px;background:#34c97b15;border:1px solid #34c97b40;color:#34c97b;}
+/* Box review buttons */
+.review-btn{position:absolute;top:8px;left:8px;width:22px;height:22px;border-radius:4px;border:none;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s,background .15s;z-index:10;}
+.diag-inner:hover .review-btn,.inner-cta-in:hover .review-btn,.inner-cta-out:hover .review-btn,.inner-cta-b2b:hover .review-btn,.inner-cta-trust:hover .review-btn,.inner-cta-org:hover .review-btn{opacity:1;}
+.review-btn.flagged{opacity:1;background:#f59e0b20;border:1px solid #f59e0b40;color:#f59e0b;}
+.review-btn.verified{opacity:1;background:none;border:none;}
+.review-btn:not(.flagged):not(.verified){background:#ffffff10;border:1px solid #ffffff15;color:#5a6178;}
+/* Verified badge — green circle checkmark SVG */
+.verified-badge{display:none;position:absolute;top:6px;right:8px;}
+.verified-badge svg{width:18px;height:18px;}
+.diag-inner.is-verified .verified-badge,.inner-cta-in.is-verified .verified-badge,.inner-cta-out.is-verified .verified-badge,.inner-cta-b2b.is-verified .verified-badge,.inner-cta-trust.is-verified .verified-badge,.inner-cta-org.is-verified .verified-badge{display:block;}
+.diag-inner.is-verified,.inner-cta-in.is-verified,.inner-cta-out.is-verified,.inner-cta-b2b.is-verified,.inner-cta-trust.is-verified,.inner-cta-org.is-verified{border-color:#34c97b60 !important;}
+.diag-inner.is-flagged,.inner-cta-in.is-flagged,.inner-cta-out.is-flagged,.inner-cta-b2b.is-flagged,.inner-cta-trust.is-flagged,.inner-cta-org.is-flagged{border-color:#f59e0b80 !important;}
+.diag-inner,.inner-cta-in,.inner-cta-out,.inner-cta-b2b,.inner-cta-trust,.inner-cta-org{position:relative;}
+/* Table row review */
+.compare-table tbody tr td:first-child{position:relative;}
+.row-review-btn{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;border:1px solid #ffffff15;cursor:pointer;font-size:9px;opacity:0;transition:opacity .15s;background:#ffffff10;color:#5a6178;vertical-align:middle;margin-left:6px;flex-shrink:0;}
+.compare-table tbody tr:hover .row-review-btn{opacity:1;}
+.row-review-btn.flagged{opacity:1;background:#f59e0b20;border-color:#f59e0b40;color:#f59e0b;}
+.row-review-btn.verified{opacity:1;background:none;border:none;color:transparent;}
+.row-verified-icon{display:none;vertical-align:middle;margin-left:4px;}
+.row-verified-icon svg{width:15px;height:15px;vertical-align:middle;}
+tr.row-is-verified .row-verified-icon{display:inline-flex;}
+tr.row-is-verified .row-review-btn{opacity:1;}
+tr.row-is-flagged td{background:#f59e0b06 !important;}
+tr.row-is-verified td{background:#34c97b05 !important;}
+/* Review panel */
+.review-panel{position:fixed;top:0;right:-340px;width:320px;height:100vh;background:#111520;border-left:1px solid var(--border);z-index:200;transition:right .25s ease;display:flex;flex-direction:column;}
+.review-panel.open{right:0;}
+.review-panel-head{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.review-panel-title{font-size:13px;font-weight:600;color:var(--text);}
+.review-panel-close{background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1;padding:2px 6px;}
+.review-panel-close:hover{color:var(--text);}
+.review-panel-body{flex:1;overflow-y:auto;padding:12px 16px;}
+.review-section{margin-bottom:16px;}
+.review-section-label{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border);}
+.review-section-label.flagged-label{color:#f59e0b;}
+.review-section-label.verified-label{color:#34c97b;}
+.review-item{font-size:11px;color:var(--text2);padding:6px 8px;border-radius:5px;margin-bottom:4px;background:var(--surface2);display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.review-item span{flex:1;line-height:1.5;}
+.review-item span strong{display:block;color:var(--text3);font-size:9px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-bottom:1px;}
+.review-item-clear{background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;padding:0 2px;}
+.review-item-clear:hover{color:var(--red);}
+.review-empty{font-size:11px;color:var(--text3);text-align:center;padding:20px 0;font-style:italic;}
+.review-toggle{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:500;padding:5px 12px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);cursor:pointer;font-family:var(--font);transition:all .15s;position:relative;}
+.review-toggle:hover{background:var(--surface3);color:var(--text);}
+.review-count{position:absolute;top:-6px;right:-6px;background:#f59e0b;color:#000;font-size:8px;font-weight:700;width:14px;height:14px;border-radius:50%;display:none;align-items:center;justify-content:center;font-family:var(--mono);}
+.review-count.visible{display:flex;}
+/* ══ Admin PIN ══ */
+.admin-btn{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;padding:5px 10px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);color:var(--text3);cursor:pointer;font-family:var(--font);transition:all .15s;margin-left:8px;}
+.admin-btn:hover{border-color:#4060a0;color:var(--text2);}
+.admin-btn svg{width:11px;height:11px;}
+.pin-overlay{position:fixed;inset:0;background:#00000088;z-index:500;display:none;align-items:center;justify-content:center;}
+.pin-overlay.open{display:flex;}
+.pin-box{background:#161c2d;border:1px solid #2a3550;border-radius:14px;padding:28px 32px;width:280px;text-align:center;}
+.pin-box h3{font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px;}
+.pin-box p{font-size:11px;color:var(--text3);margin-bottom:20px;}
+.pin-input{width:100%;background:#0e1220;border:1px solid #2a3550;border-radius:8px;padding:10px 14px;font-size:22px;font-family:var(--mono);color:var(--text);text-align:center;letter-spacing:.3em;outline:none;margin-bottom:12px;box-sizing:border-box;}
+.pin-input:focus{border-color:#4f8ef7;}
+.pin-submit{width:100%;padding:9px;border-radius:8px;background:#4f8ef720;border:1px solid #4f8ef740;color:var(--accent2);font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer;}
+.pin-submit:hover{background:#4f8ef730;}
+.pin-error{font-size:11px;color:var(--red);margin-top:8px;display:none;}
+.pin-cancel{font-size:11px;color:var(--text3);margin-top:12px;cursor:pointer;display:block;}
+.pin-cancel:hover{color:var(--text2);}
+/* Hide review controls by default — shown only when admin unlocked */
+body:not(.admin-unlocked) .review-toggle,
+body:not(.admin-unlocked) #mode-badge{display:none !important;}
+body:not(.admin-unlocked) .review-btn,
+body:not(.admin-unlocked) .row-review-btn{display:none !important;}
+body.admin-unlocked .admin-btn{color:var(--accent2);border-color:#4f8ef740;background:#4f8ef710;}
+.diag-outer{border-radius:16px;padding:20px;position:relative;margin-bottom:20px;background:#2d1f6e;border:1.5px solid #6b5fc4;}
+.diag-outer-header{text-align:center;margin-bottom:18px;}
+.diag-outer-title{font-size:16px;font-weight:600;color:#e0d8ff;letter-spacing:-.2px;}
+.diag-outer-sub{font-size:11px;color:#a498d8;margin-top:3px;}
+.diag-license-badge{position:absolute;top:16px;right:16px;background:#c8860a;border:1.5px solid #f5a623;border-radius:8px;padding:6px 12px;text-align:center;font-size:10px;font-weight:600;color:#fff3dc;line-height:1.4;}
+/* ══ Section blocks ══ */
+.diag-section{border-radius:12px;padding:14px 16px;margin-bottom:12px;}
+.diag-section-title{font-size:12px;font-weight:700;margin-bottom:2px;}
+.diag-section-sub{font-size:10px;margin-bottom:12px;}
+.sec-risk{background:#6b2d2d;border:1.5px solid #a04040;}
+.sec-risk .diag-section-title{color:#ffcfcf;}
+.sec-risk .diag-section-sub{color:#d4a0a0;}
+.sec-report{background:#1a3a4a;border:1.5px solid #2a6880;}
+.sec-report .diag-section-title{color:#b8e8f8;}
+.sec-report .diag-section-sub{color:#7ab8cc;}
+.sec-remedy{background:#1a3a28;border:1.5px solid #2a6840;}
+.sec-remedy .diag-section-title{color:#b8f0cc;}
+.sec-remedy .diag-section-sub{color:#7acc9a;}
+.sec-workload{background:#28204a;border:1.5px solid #5040a0;}
+.sec-workload .diag-section-title{color:#d0c8ff;}
+.sec-workload .diag-section-sub{color:#9888cc;}
+/* ══ Columns ══ */
+.diag-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.diag-report-cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+.diag-remedy-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.diag-work-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+/* ══ Inner boxes ══ */
+.diag-inner{border-radius:8px;padding:12px 14px;}
+.inner-signin{background:#8b1a3a;border:1.5px solid #c0305a;}
+.inner-signin .inner-title{color:#ffcce0;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-signin .inner-item{font-size:11px;color:#f0a0b8;padding:3px 0;border-bottom:1px solid #a0305030;}
+.inner-signin .inner-item:last-child{border-bottom:none;}
+.inner-user{background:#5a3800;border:1.5px solid #9a6010;}
+.inner-user .inner-title{color:#ffe0a0;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-user .inner-item{font-size:11px;color:#d4a060;padding:3px 0;border-bottom:1px solid #9a601030;}
+.inner-user .inner-item:last-child{border-bottom:none;}
+.inner-report{background:#0f2a38;border:1.5px solid #1a5070;border-radius:8px;padding:12px;text-align:center;}
+.inner-report .inner-title{font-size:12px;font-weight:700;color:#80d8f0;margin-bottom:6px;}
+.inner-report .inner-desc{font-size:10px;color:#5aa8c0;line-height:1.5;}
+.inner-auto{background:#0f2a18;border:1.5px solid #1a5030;border-radius:8px;padding:12px;}
+.inner-auto .inner-title{font-size:12px;font-weight:700;color:#80f0a0;margin-bottom:8px;text-align:center;}
+.inner-auto .inner-item{font-size:11px;color:#60c070;padding:3px 0;}
+.inner-manual{background:#282828;border:1.5px solid #484848;border-radius:8px;padding:12px;}
+.inner-manual .inner-title{font-size:12px;font-weight:700;color:#d8d8d8;margin-bottom:8px;text-align:center;}
+.inner-manual .inner-item{font-size:11px;color:#a0a0a0;padding:3px 0;}
+.inner-work{background:#1c1638;border:1.5px solid #3a2880;border-radius:8px;padding:12px;}
+.inner-work .inner-title{font-size:12px;font-weight:700;color:#c0b0ff;margin-bottom:6px;text-align:center;}
+.inner-work .inner-desc{font-size:10px;color:#8878cc;line-height:1.5;text-align:center;}
+/* ══ Export strip ══ */
+.diag-export{border-radius:8px;padding:10px 16px;background:#1e1e28;border:1.5px solid #383848;display:flex;align-items:center;gap:10px;margin-top:4px;flex-wrap:wrap;}
+.diag-export-label{font-size:12px;font-weight:700;color:#c0c0d8;flex-shrink:0;}
+.diag-export-pill{background:#28283a;border:1px solid #48487a;border-radius:4px;padding:2px 8px;color:#9898c0;font-family:'JetBrains Mono',monospace;font-size:10px;}
+
+/* ══ ID Governance section colours ══ */
+.sec-idlc{background:#3a2a1a;border:1.5px solid #7a5020;}
+.sec-idlc .diag-section-title{color:#ffd8a0;}
+.sec-idlc .diag-section-sub{color:#c09060;}
+.sec-access{background:#1e3830;border:1.5px solid #2e6850;}
+.sec-access .diag-section-title{color:#a0f0d0;}
+.sec-access .diag-section-sub{color:#60b890;}
+.sec-pim{background:#1a2a4a;border:1.5px solid #2a4a8a;}
+.sec-pim .diag-section-title{color:#a0c8ff;}
+.sec-pim .diag-section-sub{color:#6090c0;}
+.sec-compliance{background:#2a1e3a;border:1.5px solid #5a3a7a;}
+.sec-compliance .diag-section-title{color:#d8b8ff;}
+.sec-compliance .diag-section-sub{color:#a080c8;}
+/* inner boxes for governance */
+.inner-hr{background:#4a3010;border:1.5px solid #8a6020;border-radius:8px;padding:12px 14px;}
+.inner-hr .inner-title{color:#ffc870;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-hr .inner-item{font-size:11px;color:#d4a050;padding:3px 0;border-bottom:1px solid #8a602030;}
+.inner-hr .inner-item:last-child{border-bottom:none;}
+.inner-lc{background:#2e1e08;border:1.5px solid #6a4010;border-radius:8px;padding:12px 14px;}
+.inner-lc .inner-title{color:#ffa840;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-lc .inner-item{font-size:11px;color:#c07830;padding:3px 0;border-bottom:1px solid #6a401030;}
+.inner-lc .inner-item:last-child{border-bottom:none;}
+.inner-ent{background:#103028;border:1.5px solid #206050;border-radius:8px;padding:12px 14px;}
+.inner-ent .inner-title{color:#70e8b0;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-ent .inner-item{font-size:11px;color:#50b888;padding:3px 0;border-bottom:1px solid #20605030;}
+.inner-ent .inner-item:last-child{border-bottom:none;}
+.inner-rev{background:#082818;border:1.5px solid #185038;border-radius:8px;padding:12px 14px;}
+.inner-rev .inner-title{color:#50d890;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-rev .inner-item{font-size:11px;color:#40a870;padding:3px 0;border-bottom:1px solid #18503830;}
+.inner-rev .inner-item:last-child{border-bottom:none;}
+.inner-pim{background:#0e1e3a;border:1.5px solid #1e3e7a;border-radius:8px;padding:12px 14px;}
+.inner-pim .inner-title{color:#80b8f8;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-pim .inner-item{font-size:11px;color:#6090d0;padding:3px 0;border-bottom:1px solid #1e3e7a30;}
+.inner-pim .inner-item:last-child{border-bottom:none;}
+.inner-sod{background:#201530;border:1.5px solid #482870;border-radius:8px;padding:12px 14px;}
+.inner-sod .inner-title{color:#c0a0f8;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-sod .inner-item{font-size:11px;color:#9878d0;padding:3px 0;border-bottom:1px solid #48287030;}
+.inner-sod .inner-item:last-child{border-bottom:none;}
+/* page visibility */
+.page{display:none}.page.active{display:block;animation:fadeIn .2s ease}
+
+/* ══ Conditional Access section colours ══ */
+.sec-signals{background:#2a1a3a;border:1.5px solid #6030a0;}
+.sec-signals .diag-section-title{color:#e0c0ff;}
+.sec-signals .diag-section-sub{color:#a880d8;}
+.sec-decisions{background:#3a2800;border:1.5px solid #8a6000;}
+.sec-decisions .diag-section-title{color:#ffe090;}
+.sec-decisions .diag-section-sub{color:#c09040;}
+.sec-session{background:#0e2e3a;border:1.5px solid #1a6080;}
+.sec-session .diag-section-title{color:#90d8f8;}
+.sec-session .diag-section-sub{color:#5098b8;}
+.sec-templates{background:#0e2e18;border:1.5px solid #1a6030;}
+.sec-templates .diag-section-title{color:#90f0b0;}
+.sec-templates .diag-section-sub{color:#50a870;}
+.sec-agent{background:#28183a;border:1.5px solid #582888;}
+.sec-agent .diag-section-title{color:#d0a8ff;}
+.sec-agent .diag-section-sub{color:#9868c8;}
+/* CA inner boxes */
+.inner-sig-user{background:#1e0e2e;border:1.5px solid #481878;border-radius:8px;padding:12px 14px;}
+.inner-sig-user .inner-title{color:#d0a0ff;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-sig-user .inner-item{font-size:11px;color:#a878d8;padding:3px 0;border-bottom:1px solid #48187830;}
+.inner-sig-user .inner-item:last-child{border-bottom:none;}
+.inner-sig-env{background:#180e28;border:1.5px solid #381060;border-radius:8px;padding:12px 14px;}
+.inner-sig-env .inner-title{color:#b888f0;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-sig-env .inner-item{font-size:11px;color:#9060c0;padding:3px 0;border-bottom:1px solid #38106030;}
+.inner-sig-env .inner-item:last-child{border-bottom:none;}
+.inner-grant{background:#2e1e00;border:1.5px solid #705000;border-radius:8px;padding:12px 14px;}
+.inner-grant .inner-title{color:#ffc840;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-grant .inner-item{font-size:11px;color:#c89030;padding:3px 0;border-bottom:1px solid #70500030;}
+.inner-grant .inner-item:last-child{border-bottom:none;}
+.inner-block{background:#1e0e00;border:1.5px solid #502000;border-radius:8px;padding:12px 14px;}
+.inner-block .inner-title{color:#ff9060;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-block .inner-item{font-size:11px;color:#c06030;padding:3px 0;border-bottom:1px solid #50200030;}
+.inner-block .inner-item:last-child{border-bottom:none;}
+.inner-sess{background:#081e28;border:1.5px solid #104858;border-radius:8px;padding:12px 14px;}
+.inner-sess .inner-title{color:#60c8e8;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-sess .inner-item{font-size:11px;color:#4098b0;padding:3px 0;border-bottom:1px solid #10485830;}
+.inner-sess .inner-item:last-child{border-bottom:none;}
+.inner-tmpl{background:#081e10;border:1.5px solid #103820;border-radius:8px;padding:12px 14px;}
+.inner-tmpl .inner-title{color:#60e890;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-tmpl .inner-item{font-size:11px;color:#40a860;padding:3px 0;border-bottom:1px solid #10382030;}
+.inner-tmpl .inner-item:last-child{border-bottom:none;}
+.inner-ca-agent{background:#1e1028;border:1.5px solid #402060;border-radius:8px;padding:12px 14px;}
+.inner-ca-agent .inner-title{color:#c098f0;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-ca-agent .inner-item{font-size:11px;color:#9070c0;padding:3px 0;border-bottom:1px solid #40206030;}
+.inner-ca-agent .inner-item:last-child{border-bottom:none;}
+</style>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#0a0d14;
+  --surface:#111520;
+  --surface2:#161c2d;
+  --surface3:#1c2338;
+  --border:#ffffff0f;
+  --border2:#ffffff18;
+  --text:#e8eaf2;
+  --text2:#8b92ab;
+  --text3:#5a6178;
+  --accent:#4f8ef7;
+  --accent2:#6ea8ff;
+  --accent-soft:#4f8ef715;
+  --green:#34c97b;
+  --green-soft:#34c97b15;
+  --red:#f05252;
+  --red-soft:#f0525215;
+  --amber:#f59e0b;
+  --amber-soft:#f59e0b15;
+  --nav-width:260px;
+  --header-h:56px;
+  --radius:10px;
+  --radius-sm:6px;
+  --font:'Sora',sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.6;overflow:hidden}
+
+/* ── LAYOUT ── */
+.app{display:grid;grid-template-rows:var(--header-h) 1fr;grid-template-columns:var(--nav-width) 1fr;height:100vh}
+
+/* ── HEADER ── */
+header{grid-column:1/-1;display:flex;align-items:center;gap:16px;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--border);z-index:10}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:28px;height:28px;background:var(--accent);border-radius:6px;display:grid;place-items:center}
+.logo-icon svg{width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.logo-name{font-size:15px;font-weight:600;letter-spacing:-0.3px}
+.logo-name span{color:var(--accent2)}
+.header-sep{flex:1}
+.header-badge{font-family:var(--mono);font-size:11px;color:var(--text3);background:var(--surface2);border:1px solid var(--border);padding:3px 10px;border-radius:20px}
+
+/* ── NAV ── */
+nav{background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;padding:12px 0 24px}
+.nav-section{padding:16px 16px 4px;font-size:10px;font-weight:600;letter-spacing:.12em;color:var(--text3);text-transform:uppercase}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;border-radius:0;transition:background .15s;position:relative;border:none;background:none;width:100%;text-align:left;color:var(--text2);font-family:var(--font);font-size:13px}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{color:var(--text);background:var(--accent-soft)}
+.nav-item.active::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--accent);border-radius:0 2px 2px 0}
+.nav-item.active .nav-dot{background:var(--accent)}
+.nav-item.disabled{opacity:.35;cursor:not-allowed;pointer-events:none}
+.nav-dot{width:6px;height:6px;border-radius:50%;background:var(--text3);flex-shrink:0;transition:background .15s}
+.nav-icon{width:16px;height:16px;opacity:.6;flex-shrink:0}
+.nav-item.active .nav-icon{opacity:1}
+.nav-label{flex:1;line-height:1.3}
+.nav-tag{font-family:var(--mono);font-size:9px;padding:2px 6px;border-radius:20px;border:1px solid var(--border);color:var(--text3)}
+
+/* ── MAIN ── */
+main{overflow-y:auto;padding:28px 32px;background:var(--bg)}
+
+/* ── PAGE HEADER ── */
+.page-head{margin-bottom:24px}
+.page-breadcrumb{font-size:11px;color:var(--text3);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.page-breadcrumb span{color:var(--text2)}
+.page-title{font-size:22px;font-weight:600;letter-spacing:-0.5px;margin-bottom:6px}
+.page-desc{color:var(--text2);font-size:13px;max-width:620px;line-height:1.7}
+
+/* ── TABS ── */
+.tabs{display:flex;gap:2px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:4px;margin-bottom:24px;width:fit-content}
+.tab{padding:7px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;border:none;background:none;color:var(--text2);font-family:var(--font);transition:all .15s}
+.tab:hover{color:var(--text)}
+.tab.active{background:var(--surface3);color:var(--text);box-shadow:0 1px 3px #00000040}
+
+/* ── TAB PANELS ── */
+.panel{display:none}.panel.active{display:block}
+
+/* ── SECTION CARD ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:16px}
+.card-title{font-size:13px;font-weight:600;color:var(--accent2);margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.card-title::before{content:'';display:block;width:3px;height:14px;background:var(--accent);border-radius:2px}
+.card-sub{font-size:12px;color:var(--text3);margin-bottom:16px}
+
+/* ── FEATURE GRID ── */
+.feat-group{margin-bottom:20px}
+.feat-group-label{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.feat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.feat-item{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;transition:border-color .15s}
+.feat-item:hover{border-color:var(--border2)}
+.feat-name{font-size:12px;font-weight:500;color:var(--text);margin-bottom:2px}
+.feat-desc{font-size:11px;color:var(--text3);line-height:1.5}
+.feat-badge{display:inline-block;font-family:var(--mono);font-size:9px;padding:2px 6px;border-radius:3px;margin-top:4px}
+.badge-rt{background:#4f8ef720;color:var(--accent2);border:1px solid #4f8ef740}
+.badge-off{background:#8b92ab15;color:var(--text3);border:1px solid var(--border)}
+.badge-p2{background:#f59e0b15;color:var(--amber);border:1px solid #f59e0b30}
+.badge-free{background:#34c97b15;color:var(--green);border:1px solid #34c97b30}
+
+/* ── COMPARISON TABLE ── */
+.compare-table{width:100%;border-collapse:collapse;font-size:12px}
+.compare-table th{padding:10px 16px;text-align:left;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);background:var(--surface2)}
+.compare-table th:nth-child(2){color:#34c97b}
+.compare-table th:nth-child(3){color:#f05252}
+.compare-table td{padding:11px 16px;border-bottom:1px solid var(--border);vertical-align:top}
+.compare-table tr:last-child td{border-bottom:none}
+.compare-table tr:hover td{background:#ffffff04}
+.compare-table td:first-child{color:var(--text);font-weight:500}
+.avail{display:flex;align-items:flex-start;gap:7px}
+.avail-icon{flex-shrink:0;margin-top:1px}
+.avail-text{color:var(--text2);line-height:1.5}
+.avail-alt{color:var(--amber)}
+.icon-yes{color:var(--green)}
+.icon-no{color:var(--red)}
+.icon-alt{color:var(--amber)}
+
+/* ── CALLOUT ── */
+.callout{display:flex;gap:12px;padding:14px 16px;border-radius:var(--radius-sm);margin-top:20px}
+.callout-warn{background:var(--amber-soft);border:1px solid #f59e0b30}
+.callout-info{background:var(--accent-soft);border:1px solid #4f8ef730}
+.callout-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+.callout-body{font-size:12px;color:var(--text2);line-height:1.7}
+.callout-body strong{color:var(--text);font-weight:600}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:10px}
+
+/* ── PLACEHOLDER ── */
+.placeholder{text-align:center;padding:80px 40px;color:var(--text3)}
+.placeholder-icon{font-size:36px;margin-bottom:12px;opacity:.4}
+.placeholder-text{font-size:13px}
+
+/* ══ Authentication Methods section colours ══ */
+.sec-local{background:#3a1a2a;border:1.5px solid #8a3060;}
+.sec-local .diag-section-title{color:#ffb0d8;}
+.sec-local .diag-section-sub{color:#c07898;}
+.sec-mfa{background:#3a2e00;border:1.5px solid #8a7000;}
+.sec-mfa .diag-section-title{color:#ffe870;}
+.sec-mfa .diag-section-sub{color:#b8a040;}
+.sec-social{background:#0e2e38;border:1.5px solid #1a6878;}
+.sec-social .diag-section-title{color:#88e0f8;}
+.sec-social .diag-section-sub{color:#4898b0;}
+.sec-sspr{background:#0e2e18;border:1.5px solid #1a6030;}
+.sec-sspr .diag-section-title{color:#88f0a8;}
+.sec-sspr .diag-section-sub{color:#489868;}
+/* auth inner boxes */
+.inner-local-wf{background:#280a1a;border:1.5px solid #601040;border-radius:8px;padding:12px 14px;}
+.inner-local-wf .inner-title{color:#f080b8;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-local-wf .inner-item{font-size:11px;color:#c05888;padding:3px 0;border-bottom:1px solid #60104030;}
+.inner-local-wf .inner-item:last-child{border-bottom:none;}
+.inner-local-ex{background:#1e0812;border:1.5px solid #500830;border-radius:8px;padding:12px 14px;}
+.inner-local-ex .inner-title{color:#e060a0;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-local-ex .inner-item{font-size:11px;color:#a84070;padding:3px 0;border-bottom:1px solid #50083030;}
+.inner-local-ex .inner-item:last-child{border-bottom:none;}
+.inner-mfa-wf{background:#281e00;border:1.5px solid #604800;border-radius:8px;padding:12px 14px;}
+.inner-mfa-wf .inner-title{color:#ffd040;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-mfa-wf .inner-item{font-size:11px;color:#c09820;padding:3px 0;border-bottom:1px solid #60480030;}
+.inner-mfa-wf .inner-item:last-child{border-bottom:none;}
+.inner-mfa-ex{background:#1a1000;border:1.5px solid #483000;border-radius:8px;padding:12px 14px;}
+.inner-mfa-ex .inner-title{color:#f0b820;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-mfa-ex .inner-item{font-size:11px;color:#b07810;padding:3px 0;border-bottom:1px solid #48300030;}
+.inner-mfa-ex .inner-item:last-child{border-bottom:none;}
+.inner-social-wf{background:#081e28;border:1.5px solid #105060;border-radius:8px;padding:12px 14px;}
+.inner-social-wf .inner-title{color:#60c8e8;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-social-wf .inner-item{font-size:11px;color:#4090b0;padding:3px 0;border-bottom:1px solid #10506030;}
+.inner-social-wf .inner-item:last-child{border-bottom:none;}
+.inner-social-ex{background:#041218;border:1.5px solid #083848;border-radius:8px;padding:12px 14px;}
+.inner-social-ex .inner-title{color:#40a8c8;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-social-ex .inner-item{font-size:11px;color:#307090;padding:3px 0;border-bottom:1px solid #08384830;}
+.inner-social-ex .inner-item:last-child{border-bottom:none;}
+.inner-sspr-wf{background:#081e10;border:1.5px solid #103820;border-radius:8px;padding:12px 14px;}
+.inner-sspr-wf .inner-title{color:#60e890;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-sspr-wf .inner-item{font-size:11px;color:#40a860;padding:3px 0;border-bottom:1px solid #10382030;}
+.inner-sspr-wf .inner-item:last-child{border-bottom:none;}
+.inner-sspr-ex{background:#041208;border:1.5px solid #082010;border-radius:8px;padding:12px 14px;}
+.inner-sspr-ex .inner-title{color:#40c870;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-sspr-ex .inner-item{font-size:11px;color:#308050;padding:3px 0;border-bottom:1px solid #08201030;}
+.inner-sspr-ex .inner-item:last-child{border-bottom:none;}
+/* method status badges inline */
+.m-yes{color:#34c97b;font-size:10px;font-weight:600;margin-left:4px;}
+.m-no{color:#f05252;font-size:10px;font-weight:600;margin-left:4px;}
+.m-partial{color:#f59e0b;font-size:10px;font-weight:600;margin-left:4px;}
+.m-preview{color:#a78bfa;font-size:10px;font-weight:600;margin-left:4px;}
+/* ══ External ID section colours ══ */
+.sec-userflow{background:#2e1a0e;border:1.5px solid #7a4010;}
+.sec-userflow .diag-section-title{color:#ffc890;}
+.sec-userflow .diag-section-sub{color:#b07840;}
+.sec-ext{background:#1a1e38;border:1.5px solid #304080;}
+.sec-ext .diag-section-title{color:#a0b8f8;}
+.sec-ext .diag-section-sub{color:#6080c0;}
+.sec-brand{background:#0e2e38;border:1.5px solid #106878;}
+.sec-brand .diag-section-title{color:#80d8f0;}
+.sec-brand .diag-section-sub{color:#408898;}
+.sec-usermgmt{background:#102818;border:1.5px solid #206030;}
+.sec-usermgmt .diag-section-title{color:#80f0a8;}
+.sec-usermgmt .diag-section-sub{color:#409858;}
+.inner-uf-what{background:#1e0e04;border:1.5px solid #603008;border-radius:8px;padding:12px 14px;}
+.inner-uf-what .inner-title{color:#f0a050;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-uf-what .inner-item{font-size:11px;color:#b87030;padding:3px 0;border-bottom:1px solid #60300830;}
+.inner-uf-what .inner-item:last-child{border-bottom:none;}
+.inner-uf-cap{background:#140800;border:1.5px solid #482000;border-radius:8px;padding:12px 14px;}
+.inner-uf-cap .inner-title{color:#e08040;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-uf-cap .inner-item{font-size:11px;color:#a06020;padding:3px 0;border-bottom:1px solid #48200030;}
+.inner-uf-cap .inner-item:last-child{border-bottom:none;}
+.inner-ext-hooks{background:#0e1228;border:1.5px solid #202860;border-radius:8px;padding:12px 14px;}
+.inner-ext-hooks .inner-title{color:#8098e8;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-ext-hooks .inner-item{font-size:11px;color:#5068b0;padding:3px 0;border-bottom:1px solid #20286030;}
+.inner-ext-hooks .inner-item:last-child{border-bottom:none;}
+.inner-ext-do{background:#080e1e;border:1.5px solid #182050;border-radius:8px;padding:12px 14px;}
+.inner-ext-do .inner-title{color:#6080d0;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-ext-do .inner-item{font-size:11px;color:#405098;padding:3px 0;border-bottom:1px solid #18205030;}
+.inner-ext-do .inner-item:last-child{border-bottom:none;}
+.inner-brand-co{background:#041e28;border:1.5px solid #085060;border-radius:8px;padding:12px 14px;}
+.inner-brand-co .inner-title{color:#50c0e0;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-brand-co .inner-item{font-size:11px;color:#308898;padding:3px 0;border-bottom:1px solid #08506030;}
+.inner-brand-co .inner-item:last-child{border-bottom:none;}
+.inner-brand-per{background:#021218;border:1.5px solid #063848;border-radius:8px;padding:12px 14px;}
+.inner-brand-per .inner-title{color:#38a8c8;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-brand-per .inner-item{font-size:11px;color:#206878;padding:3px 0;border-bottom:1px solid #06384830;}
+.inner-brand-per .inner-item:last-child{border-bottom:none;}
+.inner-user-acct{background:#081808;border:1.5px solid #184020;border-radius:8px;padding:12px 14px;}
+.inner-user-acct .inner-title{color:#60e090;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-user-acct .inner-item{font-size:11px;color:#389858;padding:3px 0;border-bottom:1px solid #18402030;}
+.inner-user-acct .inner-item:last-child{border-bottom:none;}
+.inner-app-reg{background:#041004;border:1.5px solid #102810;border-radius:8px;padding:12px 14px;}
+.inner-app-reg .inner-title{color:#48c878;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-app-reg .inner-item{font-size:11px;color:#287848;padding:3px 0;border-bottom:1px solid #10281030;}
+.inner-app-reg .inner-item:last-child{border-bottom:none;}
+/* ══ Source buttons ══ */
+.src-btn{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:500;padding:4px 10px;border-radius:4px;background:#1c2338;border:1px solid #2a3550;color:#6080b0;text-decoration:none;transition:all .15s;white-space:nowrap;}
+.src-btn:hover{background:#252d45;border-color:#4060a0;color:#90b0e0;}
+/* Sources trigger button */
+.src-trigger{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;padding:4px 10px;border-radius:6px;background:#1c2338;border:1px solid #2a3550;color:#5a7090;cursor:pointer;font-family:var(--font);transition:all .15s;position:relative;}
+.src-trigger:hover{background:#252d45;border-color:#4060a0;color:#80b0d0;}
+.src-trigger svg{width:12px;height:12px;opacity:.6;}
+/* Popover */
+.src-popover{position:absolute;top:calc(100% + 8px);left:0;background:#161c2d;border:1px solid #2a3550;border-radius:10px;padding:14px 16px;min-width:260px;z-index:100;box-shadow:0 8px 32px #00000060;display:none;}
+.src-popover.open{display:block;animation:fadeIn .15s ease;}
+.src-popover-title{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#3a4a60;margin-bottom:10px;}
+.src-popover-links{display:flex;flex-direction:column;gap:6px;}
+.src-popover a{display:block;font-size:11px;color:#6080a8;text-decoration:none;padding:5px 8px;border-radius:5px;transition:background .12s;position:relative;padding-right:28px;}
+.src-popover a:hover{background:#1e2840;color:#90b8e0;}
+.src-popover a svg{width:9px;height:9px;opacity:.4;margin-right:5px;vertical-align:middle;}
+.src-popover a span{vertical-align:middle;}
+.m-tag{font-family:var(--mono);font-size:7px;font-weight:700;padding:1px 3px;border-radius:2px;background:#0078d420;border:1px solid #0078d450;color:#4da3e0;position:absolute;right:8px;top:50%;transform:translateY(-50%);}
+.sec-cta-inout{background:#2e1a0e;border:1.5px solid #7a4010;}
+.sec-cta-inout .diag-section-title{color:#ffc890;}
+.sec-cta-inout .diag-section-sub{color:#b07840;}
+.sec-cta-b2b{background:#2a1800;border:1.5px solid #705000;}
+.sec-cta-b2b .diag-section-title{color:#ffe080;}
+.sec-cta-b2b .diag-section-sub{color:#b09040;}
+.sec-cta-trust{background:#0e2838;border:1.5px solid #1a5878;}
+.sec-cta-trust .diag-section-title{color:#80d0f8;}
+.sec-cta-trust .diag-section-sub{color:#4088a8;}
+.sec-cta-org{background:#0e2818;border:1.5px solid #1a5030;}
+.sec-cta-org .diag-section-title{color:#80f0a8;}
+.sec-cta-org .diag-section-sub{color:#409858;}
+.inner-cta-in{background:#1e0e04;border:1.5px solid #603008;border-radius:8px;padding:12px 14px;}
+.inner-cta-in .inner-title{color:#f0a050;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-cta-in .inner-item{font-size:11px;color:#b87030;padding:3px 0;border-bottom:1px solid #60300830;}
+.inner-cta-in .inner-item:last-child{border-bottom:none;}
+.inner-cta-out{background:#140800;border:1.5px solid #482000;border-radius:8px;padding:12px 14px;}
+.inner-cta-out .inner-title{color:#e08040;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-cta-out .inner-item{font-size:11px;color:#a06020;padding:3px 0;border-bottom:1px solid #48200030;}
+.inner-cta-out .inner-item:last-child{border-bottom:none;}
+.inner-cta-b2b{background:#1e1400;border:1.5px solid #584000;border-radius:8px;padding:12px 14px;}
+.inner-cta-b2b .inner-title{color:#f0c040;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-cta-b2b .inner-item{font-size:11px;color:#b09030;padding:3px 0;border-bottom:1px solid #58400030;}
+.inner-cta-b2b .inner-item:last-child{border-bottom:none;}
+.inner-cta-trust{background:#041828;border:1.5px solid #0c3858;border-radius:8px;padding:12px 14px;}
+.inner-cta-trust .inner-title{color:#60b8e8;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-cta-trust .inner-item{font-size:11px;color:#3880a8;padding:3px 0;border-bottom:1px solid #0c385830;}
+.inner-cta-trust .inner-item:last-child{border-bottom:none;}
+.inner-cta-org{background:#061408;border:1.5px solid #183028;border-radius:8px;padding:12px 14px;}
+.inner-cta-org .inner-title{color:#60d880;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;}
+.inner-cta-org .inner-item{font-size:11px;color:#389858;padding:3px 0;border-bottom:1px solid #18302830;}
+.inner-cta-org .inner-item:last-child{border-bottom:none;}
+/* req badge */
+.req-block{display:inline-block;font-size:9px;font-weight:600;padding:2px 7px;border-radius:3px;background:#f0525215;border:1px solid #f0525240;color:#f05252;margin-top:6px;}
+.req-allow{display:inline-block;font-size:9px;font-weight:600;padding:2px 7px;border-radius:3px;background:#34c97b15;border:1px solid #34c97b40;color:#34c97b;margin-top:6px;}
+.req-cond{display:inline-block;font-size:9px;font-weight:600;padding:2px 7px;border-radius:3px;background:#f59e0b15;border:1px solid #f59e0b40;color:#f59e0b;margin-top:6px;}
+</style>
+<body>
+<div class="app">
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
+    </div>
+    <div class="logo-name">Microsoft <span>Entra</span> External ID Explorer</div>
+  </div>
+  <span class="mode-badge-private" id="mode-badge">⬤ PRIVATE</span>
+  <div class="header-sep"></div>
+  <button class="review-toggle" onclick="toggleReviewPanel()">
+    <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="5"/><path d="M7 4v3l2 1"/></svg>
+    Review
+    <span class="review-count" id="review-count">0</span>
+  </button>
+  <button class="admin-btn" id="admin-btn" onclick="openPIN()">
+    <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="8" height="6" rx="1"/><path d="M4 5V3.5a2 2 0 014 0V5"/></svg>
+    Admin
+  </button>
+</header>
+
+<!-- PIN OVERLAY -->
+<div class="pin-overlay" id="pin-overlay">
+  <div class="pin-box">
+    <h3>Admin access</h3>
+    <p>Enter your PIN to unlock review mode</p>
+    <input class="pin-input" id="pin-input" type="password" maxlength="10" placeholder="·····" onkeydown="if(event.key==='Enter')submitPIN()"/>
+    <button class="pin-submit" onclick="submitPIN()">Unlock</button>
+    <div class="pin-error" id="pin-error">Incorrect PIN — try again</div>
+    <span class="pin-cancel" onclick="closePIN()">Cancel</span>
+  </div>
+</div>
+
+<!-- REVIEW PANEL -->
+<div class="review-panel" id="review-panel">
+  <div class="review-panel-head">
+    <div class="review-panel-title">Review tracker</div>
+    <button class="review-panel-close" onclick="toggleReviewPanel()">×</button>
+  </div>
+  <div class="review-panel-body" id="review-panel-body">
+    <div class="review-empty" id="review-empty">No items flagged yet.<br>Hover over any section and click the flag icon.</div>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-section">Available</div>
+
+  <button class="nav-item active" onclick="selectPage(this,'idp')">
+    <span class="nav-dot"></span>
+    <span class="nav-label">ID Protection</span>
+    <span class="nav-tag">P2</span>
+  </button>
+  <button class="nav-item" onclick="selectPage(this,'gov')">
+    <span class="nav-dot"></span>
+    <span class="nav-label">ID Governance</span>
+    <span class="nav-tag">Gov</span>
+  </button>
+  <button class="nav-item" onclick="selectPage(this,'ca')">
+    <span class="nav-dot"></span>
+    <span class="nav-label">Conditional Access</span>
+    <span class="nav-tag">P1</span>
+  </button>
+  <button class="nav-item" onclick="selectPage(this,'auth')">
+    <span class="nav-dot"></span>
+    <span class="nav-label">Authentication Methods</span>
+  </button>
+  <button class="nav-item" onclick="selectPage(this,'eeid')">
+    <span class="nav-dot"></span>
+    <span class="nav-label">External ID (EEID)</span>
+  </button>
+  <button class="nav-item" onclick="selectPage(this,'cta')">
+    <span class="nav-dot"></span>
+    <span class="nav-label">Cross-tenant Access</span>
+  </button>
+
+  <div class="nav-section">Coming Soon</div>
+  <button class="nav-item disabled"><span class="nav-dot"></span><span class="nav-label">Privileged Identity Mgmt</span><span class="nav-tag">P2</span></button>
+  <button class="nav-item disabled"><span class="nav-dot"></span><span class="nav-label">Verified ID</span></button>
+  <button class="nav-item disabled"><span class="nav-dot"></span><span class="nav-label">Global Secure Access</span></button>
+  <button class="nav-item disabled"><span class="nav-dot"></span><span class="nav-label">Entra Internet Access</span></button>
+  <button class="nav-item disabled"><span class="nav-dot"></span><span class="nav-label">Agent ID</span><span class="nav-tag">Preview</span></button>
+</nav>
+
+<!-- MAIN -->
+<main id="main-content">
+
+  <!-- ═══ ID PROTECTION PAGE ═══ -->
+  <div id="page-idp" class="page active">
+    <div class="page-head">
+      <div class="page-breadcrumb">Microsoft Entra <span>›</span> ID Protection</div>
+      <div class="page-title" style="display:flex;align-items:center;gap:10px;">Microsoft Entra ID Protection
+        <div style="position:relative;">
+          <button class="src-trigger" onclick="toggleSources('idp',event)">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 1h4v4M10 1L5 6M2 3H1v8h8V9"/></svg>
+            Sources
+          </button>
+          <div class="src-popover" id="src-idp" >
+            <div class="src-popover-title">Reference docs</div>
+            <div class="src-popover-links">
+              <a href="https://learn.microsoft.com/en-us/entra/id-protection/overview-identity-protection" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>ID Protection overview</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/id-protection/concept-identity-protection-risks" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>Risk detections</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/id-protection/concept-identity-protection-policies" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>Risk policies</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/id-protection/howto-identity-protection-investigate-risk" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>Investigate risk</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/external-id/customers/concept-supported-features-customers" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>EEID feature comparison</span><span class="m-tag">M</span></a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="page-desc">Detects, investigates, and remediates identity-based risks in real time — powered by trillions of daily signals across Microsoft's global network.</div>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('idp','coverage')">Feature coverage</button>
+      <button class="tab" onclick="switchTab('idp','compare')">Workforce vs External ID</button>
+    </div>
+
+    <!-- TAB: FEATURE COVERAGE (diagram style) -->
+    <div class="panel active" id="idp-coverage">
+      <div class="diag-outer">
+        <div class="diag-license-badge">Requires Entra P2<br>or Entra Suite license</div>
+        <div class="diag-outer-header">
+          <div class="diag-outer-title">Microsoft Entra ID Protection</div>
+          <div class="diag-outer-sub">Detect · Investigate · Remediate identity-based risks</div>
+        </div>
+        <!-- RISK DETECTION -->
+        <div class="diag-section sec-risk">
+          <div class="diag-section-title">Risk detection</div>
+          <div class="diag-section-sub">Real-time &amp; offline signals from trillions of daily events</div>
+          <div class="diag-cols">
+            <div class="diag-inner inner-signin">
+              <div class="inner-title">Sign-in risk detections</div>
+              <div class="inner-item">Anonymous IP address</div>
+              <div class="inner-item">Atypical / impossible travel</div>
+              <div class="inner-item">Malicious IP address</div>
+              <div class="inner-item">Password spray</div>
+              <div class="inner-item">Suspicious browser activity</div>
+              <div class="inner-item">Anomalous token (sign-in)</div>
+              <div class="inner-item">Verified threat actor IP</div>
+              <div class="inner-item">Token issuer anomaly</div>
+              <div class="inner-item">Unfamiliar sign-in properties</div>
+              <div class="inner-item">Suspicious inbox forwarding</div>
+              <div class="inner-item">Suspicious inbox manipulation</div>
+              <div class="inner-item">Mass access to sensitive files</div>
+              <div class="inner-item">New country</div>
+              <div class="inner-item">Microsoft Entra threat intel</div>
+            </div>
+            <div class="diag-inner inner-user">
+              <div class="inner-title">User risk detections</div>
+              <div class="inner-item">Leaked credentials</div>
+              <div class="inner-item">Anomalous user activity</div>
+              <div class="inner-item">Attacker in the middle (AiTM)</div>
+              <div class="inner-item">PRT access attempt</div>
+              <div class="inner-item">Suspicious API traffic</div>
+              <div class="inner-item">Suspicious sending patterns</div>
+              <div class="inner-item">User-reported suspicious activity</div>
+              <div class="inner-item">Anomalous token (user)</div>
+            </div>
+          </div>
+        </div>
+        <!-- REPORTING -->
+        <div class="diag-section sec-report">
+          <div class="diag-section-title">Reporting &amp; investigation</div>
+          <div class="diag-section-sub">Three admin-facing dashboards for tracking and acting on risk</div>
+          <div class="diag-report-cols">
+            <div class="inner-report">
+              <div class="inner-title">Risk detections</div>
+              <div class="inner-desc">Per-event risk log with type &amp; severity via portal or Graph API</div>
+            </div>
+            <div class="inner-report">
+              <div class="inner-title">Risky sign-ins</div>
+              <div class="inner-desc">Sign-ins flagged by one or more risk detections</div>
+            </div>
+            <div class="inner-report">
+              <div class="inner-title">Risky users</div>
+              <div class="inner-desc">Users with active risk detections or risky sign-in history</div>
+            </div>
+          </div>
+        </div>
+        <!-- REMEDIATION -->
+        <div class="diag-section sec-remedy">
+          <div class="diag-section-title">Remediation</div>
+          <div class="diag-section-sub">Automated policies + manual admin actions</div>
+          <div class="diag-remedy-cols">
+            <div class="inner-auto">
+              <div class="inner-title">Automatic (risk policies)</div>
+              <div class="inner-item">Risk-based Conditional Access</div>
+              <div class="inner-item">Require MFA or password reset</div>
+              <div class="inner-item">Microsoft-managed remediation policies (P2 only)</div>
+            </div>
+            <div class="inner-manual">
+              <div class="inner-title">Manual (admin actions)</div>
+              <div class="inner-item">Dismiss risk</div>
+              <div class="inner-item">Confirm safe sign-in</div>
+              <div class="inner-item">Confirm compromise</div>
+              <div class="inner-item">Force password reset</div>
+            </div>
+          </div>
+        </div>
+        <!-- WORKLOAD & AGENT -->
+        <div class="diag-section sec-workload">
+          <div class="diag-section-title">Workload &amp; agent identity protection</div>
+          <div class="diag-section-sub">Extends risk detection beyond human users</div>
+          <div class="diag-work-cols">
+            <div class="inner-work">
+              <div class="inner-title">Workload identity risks</div>
+              <div class="inner-desc">Service principals &amp; apps — requires Workload Identities Premium</div>
+            </div>
+            <div class="inner-work">
+              <div class="inner-title">Risky agents (preview)</div>
+              <div class="inner-desc">AI agent identity risk via Microsoft Entra Agent ID platform</div>
+            </div>
+          </div>
+        </div>
+        <!-- DATA EXPORT STRIP -->
+        <div class="diag-export">
+          <div class="diag-export-label">Data export &amp; SIEM</div>
+          <span class="diag-export-pill">Microsoft Sentinel</span>
+          <span class="diag-export-pill">Log Analytics</span>
+          <span class="diag-export-pill">Event Hubs</span>
+          <span class="diag-export-pill">Storage Accounts</span>
+          <span class="diag-export-pill">Graph API</span>
+        </div>
+      </div><!-- /diag-outer -->
+    </div><!-- /idp-coverage -->
+
+    <!-- TAB: COMPARE -->
+    <div class="panel" id="idp-compare">
+      <div class="card">
+        <div class="card-title">Feature availability comparison</div>
+        <div class="card-sub">Workforce tenant (enterprise users) vs Entra External ID (customer-facing apps)</div>
+
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th style="width:30%">Feature</th>
+              <th style="width:35%">✓ Workforce tenant</th>
+              <th style="width:35%">✗ Entra External ID</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Sign-in risk detections</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">All 14 detection types — real-time and offline</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available</span></div></td>
+            </tr>
+            <tr>
+              <td>User risk detections</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">All 10 detection types including leaked credentials</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available</span></div></td>
+            </tr>
+            <tr>
+              <td>Risk-based Conditional Access</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Sign-in risk + user risk conditions, auto MFA trigger</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available</span></div></td>
+            </tr>
+            <tr>
+              <td>Risky users / sign-ins reports</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Full dashboard + Graph API access</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available</span></div></td>
+            </tr>
+            <tr>
+              <td>Automatic remediation</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Auto MFA, password reset on risk trigger</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available</span></div></td>
+            </tr>
+            <tr>
+              <td>Manual admin actions</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Dismiss, confirm safe, confirm compromise</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available</span></div></td>
+            </tr>
+            <tr>
+              <td>Workload &amp; agent identity risk</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Service principals, apps, AI agents (Agent ID)</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available</span></div></td>
+            </tr>
+            <tr>
+              <td>SIEM / data export</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Sentinel, Log Analytics, Event Hubs, Graph API</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available</span></div></td>
+            </tr>
+            <tr>
+              <td>DDoS / bot / WAF protection</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Via Akamai / Cloudflare partner integrations</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-alt">~</span><span class="avail-text avail-alt">Available via partner integrations (Akamai, Cloudflare)</span></div></td>
+            </tr>
+            <tr>
+              <td>Sign-up fraud prevention</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Via ID Protection + Conditional Access</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-alt">~</span><span class="avail-text avail-alt">Available via Microsoft Security Store partners</span></div></td>
+            </tr>
+            <tr>
+              <td>MFA enforcement</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Adaptive — triggered by risk level</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-alt">~</span><span class="avail-text avail-alt">Available but always-on, not risk-adaptive</span></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout callout-warn">
+        <div class="callout-icon">⚠</div>
+        <div class="callout-body">
+          <strong>Why the gap?</strong> External ID is a CIAM platform designed for consumer and business-customer apps. Microsoft has not yet brought the full ID Protection risk intelligence engine into the external tenant model. If adaptive risk-based protection is a requirement, consider a <strong>workforce tenant with B2B collaboration</strong>, or supplement with custom authentication extensions and third-party fraud detection providers.
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /page-idp -->
+
+  <!-- ═══ ID GOVERNANCE PAGE ═══ -->
+  <div id="page-gov" class="page">
+    <div class="page-head">
+      <div class="page-breadcrumb">Microsoft Entra <span>›</span> ID Governance</div>
+      <div class="page-title" style="display:flex;align-items:center;gap:10px;">Microsoft Entra ID Governance
+        <div style="position:relative;">
+          <button class="src-trigger" onclick="toggleSources('gov',event)">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 1h4v4M10 1L5 6M2 3H1v8h8V9"/></svg>
+            Sources
+          </button>
+          <div class="src-popover" id="src-gov" >
+            <div class="src-popover-title">Reference docs</div>
+            <div class="src-popover-links">
+              <a href="https://learn.microsoft.com/en-us/entra/id-governance/identity-governance-overview" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>ID Governance overview</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/id-governance/entitlement-management-overview" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>Entitlement management</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/id-governance/access-reviews-overview" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>Access reviews</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/id-governance/privileged-identity-management/pim-configure" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>PIM</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/id-governance/lifecycle-workflows-overview" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>Lifecycle workflows</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/external-id/customers/concept-supported-features-customers" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>EEID feature comparison</span><span class="m-tag">M</span></a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="page-desc">Ensures the right people have the right access to the right resources — and you can prove it. Automates identity and access lifecycles across employees, guests, and privileged users.</div>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('gov','coverage')">Feature coverage</button>
+      <button class="tab" onclick="switchTab('gov','compare')">Workforce vs External ID</button>
+    </div>
+
+    <!-- TAB: FEATURE COVERAGE -->
+    <div class="panel active" id="gov-coverage">
+      <div class="diag-outer">
+        <div class="diag-license-badge">Requires Entra ID<br>Governance add-on</div>
+        <div class="diag-outer-header">
+          <div class="diag-outer-title">Microsoft Entra ID Governance</div>
+          <div class="diag-outer-sub">Govern identity lifecycle · Access lifecycle · Privileged access</div>
+        </div>
+
+        <!-- IDENTITY LIFECYCLE -->
+        <div class="diag-section sec-idlc">
+          <div class="diag-section-title">Identity lifecycle (Joiner / Mover / Leaver)</div>
+          <div class="diag-section-sub">Automate provisioning and deprovisioning driven by HR systems</div>
+          <div class="diag-cols">
+            <div class="diag-inner inner-hr">
+              <div class="inner-title">HR-driven provisioning</div>
+              <div class="inner-item">Workday inbound provisioning</div>
+              <div class="inner-item">SuccessFactors inbound provisioning</div>
+              <div class="inner-item">Creates / updates accounts in Entra ID &amp; AD</div>
+              <div class="inner-item">Attribute-based user profile sync</div>
+              <div class="inner-item">Supports joiner, mover, leaver signals</div>
+            </div>
+            <div class="diag-inner inner-lc">
+              <div class="inner-title">Lifecycle workflows</div>
+              <div class="inner-item">Pre-hire onboarding tasks</div>
+              <div class="inner-item">Day-1 welcome emails &amp; access pass</div>
+              <div class="inner-item">Job change / mover workflows</div>
+              <div class="inner-item">Offboarding &amp; account disablement</div>
+              <div class="inner-item">Custom extensions via Logic Apps</div>
+              <div class="inner-item">Scheduled &amp; bulk workflow execution</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ACCESS LIFECYCLE -->
+        <div class="diag-section sec-access">
+          <div class="diag-section-title">Access lifecycle</div>
+          <div class="diag-section-sub">Manage who gets access to what, for how long, and by whose approval</div>
+          <div class="diag-cols">
+            <div class="diag-inner inner-ent">
+              <div class="inner-title">Entitlement management</div>
+              <div class="inner-item">Access packages (bundles of resources)</div>
+              <div class="inner-item">Self-service access requests</div>
+              <div class="inner-item">Multi-stage approval workflows</div>
+              <div class="inner-item">Time-limited &amp; auto-expiring access</div>
+              <div class="inner-item">Guest / B2B access via packages</div>
+              <div class="inner-item">Automatic group &amp; app role assignment</div>
+              <div class="inner-item">Separation of duties (SoD) enforcement</div>
+            </div>
+            <div class="diag-inner inner-rev">
+              <div class="inner-title">Access reviews</div>
+              <div class="inner-item">Recurring recertification campaigns</div>
+              <div class="inner-item">AI-powered reviewer suggestions</div>
+              <div class="inner-item">Microsoft 365 &amp; dynamic group reviews</div>
+              <div class="inner-item">Access history &amp; decision insights</div>
+              <div class="inner-item">Guest account cleanup automation</div>
+              <div class="inner-item">Delegated review to business owners</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PRIVILEGED ACCESS (PIM) -->
+        <div class="diag-section sec-pim">
+          <div class="diag-section-title">Privileged access — PIM</div>
+          <div class="diag-section-sub">Just-in-time elevated access with full audit trail</div>
+          <div class="diag-cols">
+            <div class="diag-inner inner-pim">
+              <div class="inner-title">Just-in-time access</div>
+              <div class="inner-item">Eligible role assignments (not permanent)</div>
+              <div class="inner-item">Time-bound activation with justification</div>
+              <div class="inner-item">MFA required on activation</div>
+              <div class="inner-item">Approval workflows for sensitive roles</div>
+              <div class="inner-item">Covers Entra, Azure, M365, group roles</div>
+            </div>
+            <div class="diag-inner inner-pim">
+              <div class="inner-title">Alerts &amp; governance</div>
+              <div class="inner-item">Role change &amp; activation alerts</div>
+              <div class="inner-item">Privileged role access reviews</div>
+              <div class="inner-item">Audit history for all role activations</div>
+              <div class="inner-item">Discovery of permanent admin assignments</div>
+              <div class="inner-item">Notifications to security teams</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- COMPLIANCE & AUDIT -->
+        <div class="diag-section sec-compliance">
+          <div class="diag-section-title">Compliance &amp; audit</div>
+          <div class="diag-section-sub">Prove controls are working to auditors and regulators</div>
+          <div class="diag-cols">
+            <div class="diag-inner inner-sod">
+              <div class="inner-title">Separation of duties (SoD)</div>
+              <div class="inner-item">Define incompatible role combinations</div>
+              <div class="inner-item">Block conflicting access at request time</div>
+              <div class="inner-item">Built-in SoD policy templates</div>
+              <div class="inner-item">Risk-based access approvals</div>
+            </div>
+            <div class="diag-inner inner-sod">
+              <div class="inner-title">Audit &amp; reporting</div>
+              <div class="inner-item">Built-in audit logs &amp; attestation reports</div>
+              <div class="inner-item">Compliance-ready access history</div>
+              <div class="inner-item">Graph API for automation &amp; export</div>
+              <div class="inner-item">Advanced SCIM provisioning mappings</div>
+              <div class="inner-item">Context-based access decisions</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- INTEGRATIONS STRIP -->
+        <div class="diag-export">
+          <div class="diag-export-label">Integrations</div>
+          <span class="diag-export-pill">Workday</span>
+          <span class="diag-export-pill">SuccessFactors</span>
+          <span class="diag-export-pill">SAP</span>
+          <span class="diag-export-pill">ServiceNow</span>
+          <span class="diag-export-pill">SCIM apps</span>
+          <span class="diag-export-pill">LDAP / SQL</span>
+          <span class="diag-export-pill">On-premises AD</span>
+          <span class="diag-export-pill">Logic Apps</span>
+        </div>
+
+      </div><!-- /diag-outer -->
+    </div><!-- /gov-coverage -->
+
+    <!-- TAB: COMPARE -->
+    <div class="panel" id="gov-compare">
+      <div class="card">
+        <div class="card-title">Feature availability comparison</div>
+        <div class="card-sub">Workforce tenant (enterprise users) vs Entra External ID (customer-facing apps)</div>
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th style="width:30%">Feature</th>
+              <th style="width:35%">✓ Workforce tenant</th>
+              <th style="width:35%">✗ Entra External ID</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Identity lifecycle / HR provisioning</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Workday, SuccessFactors inbound provisioning to Entra ID &amp; AD</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available</span></div></td>
+            </tr>
+            <tr>
+              <td>Lifecycle workflows</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Joiner / mover / leaver automation with Logic Apps extensions</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available</span></div></td>
+            </tr>
+            <tr>
+              <td>Entitlement management</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Access packages, self-service requests, approval workflows</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available</span></div></td>
+            </tr>
+            <tr>
+              <td>Access reviews</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Recurring recertification with AI suggestions, guest cleanup</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available</span></div></td>
+            </tr>
+            <tr>
+              <td>Privileged Identity Management (PIM)</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">JIT access, time-bound role activation, approval workflows</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available</span></div></td>
+            </tr>
+            <tr>
+              <td>Separation of duties (SoD)</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Incompatible role definitions, built-in policy templates</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available</span></div></td>
+            </tr>
+            <tr>
+              <td>Audit logs &amp; compliance reports</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Full attestation reports, Graph API export, access history</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available</span></div></td>
+            </tr>
+            <tr>
+              <td>App provisioning (SCIM / LDAP / SQL)</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Hundreds of cloud and on-premises app connectors</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available</span></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout callout-warn">
+        <div class="callout-icon">⚠</div>
+        <div class="callout-body">
+          <strong>Why the gap?</strong> ID Governance is designed for managing enterprise employee and partner identity lifecycles. The External ID platform is scoped to consumer and business-customer authentication (CIAM) and does not include governance controls like access packages, PIM, lifecycle workflows, or access reviews.
+        </div>
+      </div>
+    </div><!-- /gov-compare -->
+
+  </div><!-- /page-gov -->
+
+  <!-- ═══ CONDITIONAL ACCESS PAGE ═══ -->
+  <div id="page-ca" class="page">
+    <div class="page-head">
+      <div class="page-breadcrumb">Microsoft Entra <span>›</span> Conditional Access</div>
+      <div class="page-title" style="display:flex;align-items:center;gap:10px;">Microsoft Entra Conditional Access
+        <div style="position:relative;">
+          <button class="src-trigger" onclick="toggleSources('ca',event)">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 1h4v4M10 1L5 6M2 3H1v8h8V9"/></svg>
+            Sources
+          </button>
+          <div class="src-popover" id="src-ca" >
+            <div class="src-popover-title">Reference docs</div>
+            <div class="src-popover-links">
+              <a href="https://learn.microsoft.com/en-us/entra/identity/conditional-access/overview" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>Conditional Access overview</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/identity/conditional-access/concept-conditional-access-conditions" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>Conditions</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/identity/conditional-access/concept-conditional-access-grant" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>Grant controls</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/identity/conditional-access/concept-conditional-access-session" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>Session controls</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/identity/conditional-access/concept-conditional-access-policy-common" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>Common policy templates</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/external-id/customers/concept-supported-features-customers" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>EEID feature comparison</span><span class="m-tag">M</span></a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="page-desc">Microsoft's Zero Trust policy engine — evaluates signals from users, devices, locations, and risk to make real-time access decisions. If a user wants to access a resource, then they must satisfy the policy.</div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('ca','coverage')">Feature coverage</button>
+      <button class="tab" onclick="switchTab('ca','compare')">Workforce vs External ID</button>
+    </div>
+
+    <!-- TAB: FEATURE COVERAGE -->
+    <div class="panel active" id="ca-coverage">
+      <div class="diag-outer">
+        <div class="diag-license-badge">Core: Entra ID P1<br>Risk-based: P2</div>
+        <div class="diag-outer-header">
+          <div class="diag-outer-title">Microsoft Entra Conditional Access</div>
+          <div class="diag-outer-sub">Signals → Decision → Enforcement &nbsp;·&nbsp; Zero Trust policy engine</div>
+        </div>
+
+        <!-- SIGNALS -->
+        <div class="diag-section sec-signals">
+          <div class="diag-section-title">Signals (inputs)</div>
+          <div class="diag-section-sub">CA evaluates these in real time to determine the right access decision</div>
+          <div class="diag-cols">
+            <div class="diag-inner inner-sig-user">
+              <div class="inner-title">Identity signals</div>
+              <div class="inner-item">Specific users, groups, or roles</div>
+              <div class="inner-item">Guest / external users</div>
+              <div class="inner-item">AI agent identities (preview)</div>
+              <div class="inner-item">Sign-in risk level (from ID Protection)</div>
+              <div class="inner-item">User risk level (from ID Protection)</div>
+              <div class="inner-item">Insider risk level (from Purview)</div>
+            </div>
+            <div class="diag-inner inner-sig-env">
+              <div class="inner-title">Environment signals</div>
+              <div class="inner-item">Named locations (IP ranges)</div>
+              <div class="inner-item">Country / region</div>
+              <div class="inner-item">Device platform &amp; compliance state</div>
+              <div class="inner-item">Device filter (e.g. PAW only)</div>
+              <div class="inner-item">Application being accessed</div>
+              <div class="inner-item">Client app type (browser, legacy auth)</div>
+              <div class="inner-item">Authentication context</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- DECISIONS -->
+        <div class="diag-section sec-decisions">
+          <div class="diag-section-title">Access decisions (outputs)</div>
+          <div class="diag-section-sub">What CA enforces once signals are evaluated</div>
+          <div class="diag-cols">
+            <div class="diag-inner inner-grant">
+              <div class="inner-title">Grant access (with controls)</div>
+              <div class="inner-item">Require MFA</div>
+              <div class="inner-item">Require authentication strength (phishing-resistant)</div>
+              <div class="inner-item">Require compliant device (Intune)</div>
+              <div class="inner-item">Require Hybrid Entra joined device</div>
+              <div class="inner-item">Require approved client app</div>
+              <div class="inner-item">Require app protection policy</div>
+              <div class="inner-item">Require password change</div>
+              <div class="inner-item">Require terms of use acceptance</div>
+            </div>
+            <div class="diag-inner inner-block">
+              <div class="inner-title">Block / restrict access</div>
+              <div class="inner-item">Block access entirely</div>
+              <div class="inner-item">Block legacy authentication protocols</div>
+              <div class="inner-item">Block by location / country</div>
+              <div class="inner-item">Block risky sign-ins (P2)</div>
+              <div class="inner-item">Block non-compliant devices</div>
+              <div class="inner-item">Limit access (session restriction)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SESSION CONTROLS -->
+        <div class="diag-section sec-session">
+          <div class="diag-section-title">Session controls</div>
+          <div class="diag-section-sub">Real-time monitoring and restriction of active app sessions</div>
+          <div class="diag-cols">
+            <div class="diag-inner inner-sess">
+              <div class="inner-title">App-enforced restrictions</div>
+              <div class="inner-item">Limit downloads in SharePoint / Exchange</div>
+              <div class="inner-item">Block copy / print in browser sessions</div>
+              <div class="inner-item">Enforce read-only access on unmanaged devices</div>
+              <div class="inner-item">Sign-in frequency controls</div>
+              <div class="inner-item">Persistent browser session control</div>
+            </div>
+            <div class="diag-inner inner-sess">
+              <div class="inner-title">Defender for Cloud Apps (MCAS)</div>
+              <div class="inner-item">Conditional Access App Control (proxy)</div>
+              <div class="inner-item">Real-time session monitoring</div>
+              <div class="inner-item">Block sensitive data exfiltration</div>
+              <div class="inner-item">Monitor &amp; control SaaS app activity</div>
+              <div class="inner-item">Continuous access evaluation (CAE)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- POLICY TEMPLATES -->
+        <div class="diag-section sec-templates">
+          <div class="diag-section-title">Common policy templates</div>
+          <div class="diag-section-sub">Built-in starting points aligned with Zero Trust best practices</div>
+          <div class="diag-cols">
+            <div class="diag-inner inner-tmpl">
+              <div class="inner-title">MFA policies</div>
+              <div class="inner-item">Require MFA for all admins</div>
+              <div class="inner-item">Require MFA for Azure management</div>
+              <div class="inner-item">Require MFA for all users</div>
+              <div class="inner-item">Require phishing-resistant MFA for admins</div>
+              <div class="inner-item">Require trusted location for MFA registration</div>
+            </div>
+            <div class="diag-inner inner-tmpl">
+              <div class="inner-title">Device &amp; risk policies</div>
+              <div class="inner-item">Require compliant or Entra joined device</div>
+              <div class="inner-item">Block legacy authentication</div>
+              <div class="inner-item">Block risky sign-ins (P2)</div>
+              <div class="inner-item">Require password change for high-risk users (P2)</div>
+              <div class="inner-item">Report-only mode for safe policy testing</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CA OPTIMIZATION AGENT -->
+        <div class="diag-section sec-agent">
+          <div class="diag-section-title">CA Optimization Agent</div>
+          <div class="diag-section-sub">AI-powered policy recommendations via Microsoft Security Copilot</div>
+          <div class="diag-cols">
+            <div class="diag-inner inner-ca-agent">
+              <div class="inner-title">Policy recommendations</div>
+              <div class="inner-item">Detects users / apps not covered by any policy</div>
+              <div class="inner-item">Suggests new policies based on Zero Trust</div>
+              <div class="inner-item">One-click policy creation or update</div>
+              <div class="inner-item">Requires P1 + Security Compute Units (SCU)</div>
+            </div>
+            <div class="diag-inner inner-ca-agent">
+              <div class="inner-title">Policy review reports</div>
+              <div class="inner-item">Flags spikes / dips in policy matches</div>
+              <div class="inner-item">Detects potential misconfigurations</div>
+              <div class="inner-item">Coverage tab — apps with / without CA</div>
+              <div class="inner-item">What-if analysis for policy simulation</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- INTEGRATIONS STRIP -->
+        <div class="diag-export">
+          <div class="diag-export-label">Integrations</div>
+          <span class="diag-export-pill">ID Protection (risk)</span>
+          <span class="diag-export-pill">Intune (compliance)</span>
+          <span class="diag-export-pill">Defender for Cloud Apps</span>
+          <span class="diag-export-pill">PIM</span>
+          <span class="diag-export-pill">Purview (insider risk)</span>
+          <span class="diag-export-pill">Named Locations</span>
+          <span class="diag-export-pill">Graph API</span>
+        </div>
+
+      </div><!-- /diag-outer -->
+    </div><!-- /ca-coverage -->
+
+    <!-- TAB: COMPARE -->
+    <div class="panel" id="ca-compare">
+      <div class="card">
+        <div class="card-title">Feature availability comparison</div>
+        <div class="card-sub">Workforce tenant (enterprise users) vs Entra External ID (customer-facing apps)</div>
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th style="width:30%">Feature</th>
+              <th style="width:35%">✓ Workforce tenant</th>
+              <th style="width:35%">~ Entra External ID</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Basic CA policies (MFA, block)</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Full policy engine — users, groups, apps, locations</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-alt">~</span><span class="avail-text avail-alt">Supported — MFA, block, grant controls work in external tenants</span></div></td>
+            </tr>
+            <tr>
+              <td>Risk-based CA (sign-in / user risk)</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Full risk-based conditions via ID Protection (P2)</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available — ID Protection not supported in external tenants</span></div></td>
+            </tr>
+            <tr>
+              <td>Device compliance conditions</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Require Intune-compliant or Entra-joined device</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available — consumer devices not enrolled in Intune</span></div></td>
+            </tr>
+            <tr>
+              <td>Session controls (MCAS)</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Full Defender for Cloud Apps session proxy integration</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available</span></div></td>
+            </tr>
+            <tr>
+              <td>Named locations / country block</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">IP ranges and country-based conditions fully supported</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-alt">~</span><span class="avail-text avail-alt">Partially supported — location conditions available in external tenants</span></div></td>
+            </tr>
+            <tr>
+              <td>Authentication strength</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Phishing-resistant MFA, FIDO2, Windows Hello enforcement</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-alt">~</span><span class="avail-text avail-alt">Limited — depends on auth methods configured in external tenant</span></div></td>
+            </tr>
+            <tr>
+              <td>CA Optimization Agent</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">AI-powered policy recommendations via Security Copilot</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available</span></div></td>
+            </tr>
+            <tr>
+              <td>Report-only mode</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Test policies without enforcement before going live</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-alt">~</span><span class="avail-text avail-alt">Available in external tenants for supported policy types</span></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- MFA ENFORCEMENT METHODS -->
+      <div class="card" style="margin-top:16px;border-color:#1a5030;">
+        <div class="card-title" style="color:#80f0a0;">MFA enforcement — methods compared</div>
+        <div class="card-sub">Per-user MFA (legacy) must not be used — use Conditional Access or Security Defaults instead</div>
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th style="width:28%">Method</th>
+              <th style="width:18%">Status</th>
+              <th style="width:27%">Workforce tenant</th>
+              <th style="width:27%">Entra External ID</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Per-user MFA (legacy)</td>
+              <td><div style="display:inline-block;font-size:9px;font-weight:600;padding:2px 7px;border-radius:3px;background:#f59e0b15;border:1px solid #f59e0b40;color:#f59e0b;">⚠ Deprecated</div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Must NOT be used — toggles MFA per individual user account. Predates CA, being deprecated by Microsoft. Does not scale and bypasses CA policies</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Does not exist in External ID — never part of the CIAM model. Automatically not applicable</span></div></td>
+            </tr>
+            <tr>
+              <td>Security Defaults</td>
+              <td><div style="display:inline-block;font-size:9px;font-weight:600;padding:2px 7px;border-radius:3px;background:#34c97b20;border:1px solid #34c97b40;color:#34c97b;">✓ Free</div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Enables baseline MFA for all users at no cost — good for smaller orgs without P1/P2. Cannot be combined with CA policies</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not applicable in External ID — use CA policies or user flow MFA settings instead</span></div></td>
+            </tr>
+            <tr>
+              <td>Conditional Access (recommended)</td>
+              <td><div style="display:inline-block;font-size:9px;font-weight:600;padding:2px 7px;border-radius:3px;background:#4f8ef720;border:1px solid #4f8ef740;color:#6ea8ff;">✓ P1</div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Granular policy-based MFA — per app, group, location, risk level. Recommended approach. Requires P1</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Supported in external tenants — enforce MFA per app or all users via CA policy</span></div></td>
+            </tr>
+            <tr>
+              <td>User flow MFA setting</td>
+              <td><div style="display:inline-block;font-size:9px;font-weight:600;padding:2px 7px;border-radius:3px;background:#34c97b20;border:1px solid #34c97b40;color:#34c97b;">✓ EEID</div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not applicable — workforce does not use user flows</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">MFA can be enabled directly in the user flow — simpler alternative to CA for External ID</span></div></td>
+            </tr>
+            <tr>
+              <td>Authentication Strengths (CA)</td>
+              <td><div style="display:inline-block;font-size:9px;font-weight:600;padding:2px 7px;border-radius:3px;background:#4f8ef720;border:1px solid #4f8ef740;color:#6ea8ff;">✓ P1</div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Enforce phishing-resistant MFA (FIDO2, WHfB, CBA) via CA authentication strength condition</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-alt">~</span><span class="avail-text avail-alt">Limited — depends on which auth methods are configured in the external tenant</span></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout callout-info">
+        <div class="callout-icon">ℹ</div>
+        <div class="callout-body">
+          <strong>External ID note:</strong> Unlike ID Protection and Governance, Conditional Access has <strong>partial support</strong> in external tenants. Basic grant/block policies and MFA enforcement work — but risk-based conditions, device compliance, and session controls are not available since those depend on workforce-only features (ID Protection, Intune, Defender for Cloud Apps).
+        </div>
+      </div>
+    </div><!-- /ca-compare -->
+
+  </div><!-- /page-ca -->
+
+  <!-- ═══ AUTHENTICATION METHODS PAGE ═══ -->
+  <div id="page-auth" class="page">
+    <div class="page-head">
+      <div class="page-breadcrumb">Microsoft Entra <span>›</span> Authentication Methods</div>
+      <div class="page-title" style="display:flex;align-items:center;gap:10px;">Authentication Methods
+        <div style="position:relative;">
+          <button class="src-trigger" onclick="toggleSources('auth',event)">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 1h4v4M10 1L5 6M2 3H1v8h8V9"/></svg>
+            Sources
+          </button>
+          <div class="src-popover" id="src-auth" >
+            <div class="src-popover-title">Reference docs</div>
+            <div class="src-popover-links">
+              <a href="https://learn.microsoft.com/en-us/entra/identity/authentication/concept-authentication-methods" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>Authentication methods</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/external-id/customers/concept-authentication-methods-customers" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>EEID auth methods</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/identity/authentication/concept-sspr-howitworks" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>SSPR</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/external-id/customers/concept-multifactor-authentication-customers" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>EEID MFA</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/external-id/customers/concept-supported-features-customers" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>EEID feature comparison</span><span class="m-tag">M</span></a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="page-desc">How users prove their identity — covers first-factor sign-in methods, second-factor MFA methods, social / federated identity providers, and self-service password reset (SSPR). Support varies significantly between workforce and External ID tenants.</div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('auth','coverage')">Feature coverage</button>
+      <button class="tab" onclick="switchTab('auth','compare')">Workforce vs External ID</button>
+    </div>
+
+    <!-- TAB: FEATURE COVERAGE -->
+    <div class="panel active" id="auth-coverage">
+      <div class="diag-outer">
+        <div class="diag-license-badge">Varies by method<br>P1 / P2 / Free</div>
+        <div class="diag-outer-header">
+          <div class="diag-outer-title">Authentication Methods</div>
+          <div class="diag-outer-sub">First factor · MFA / Second factor · Social IdPs · SSPR</div>
+        </div>
+
+        <!-- LOCAL ACCOUNT — FIRST FACTOR -->
+        <div class="diag-section sec-local">
+          <div class="diag-section-title">Local account — first factor methods</div>
+          <div class="diag-section-sub">How users prove identity with a locally managed account at sign-in</div>
+          <div class="diag-cols">
+            <div class="diag-inner inner-local-wf">
+              <div class="inner-title">Password-based</div>
+              <div class="inner-item">Email + Password — standard credential login</div>
+              <div class="inner-item">Username / Alias + Password — sign in with custom ID (e.g. membership number)</div>
+              <div class="inner-item">SMS OTP — phone number as identity, code sent via SMS (frontline workers)</div>
+            </div>
+            <div class="diag-inner inner-local-ex">
+              <div class="inner-title">Passwordless</div>
+              <div class="inner-item">Email OTP — one-time code sent to email each sign-in, no stored password</div>
+              <div class="inner-item">FIDO2 / Passkeys — hardware security key or device passkey, phishing-resistant</div>
+              <div class="inner-item">Windows Hello for Business — biometric or PIN tied to the device, phishing-resistant</div>
+              <div class="inner-item">Temporary Access Pass (TAP) — time-limited code for onboarding or account recovery</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- MFA — SECOND FACTOR -->
+        <div class="diag-section sec-mfa">
+          <div class="diag-section-title">MFA — second factor methods</div>
+          <div class="diag-section-sub">Step-up verification layer added after first-factor authentication succeeds</div>
+          <div class="diag-cols">
+            <div class="diag-inner inner-mfa-wf">
+              <div class="inner-title">App-based</div>
+              <div class="inner-item">Microsoft Authenticator (push) — approve or deny sign-in via push notification</div>
+              <div class="inner-item">Microsoft Authenticator (TOTP) — time-based 6-digit code from the app</div>
+              <div class="inner-item">OATH hardware tokens — physical token generating TOTP codes</div>
+              <div class="inner-item">OATH software tokens — third-party TOTP app (e.g. Google Authenticator)</div>
+            </div>
+            <div class="diag-inner inner-mfa-ex">
+              <div class="inner-title">OTP-based</div>
+              <div class="inner-item">Email OTP — one-time code sent to user's email address</div>
+              <div class="inner-item">SMS OTP — one-time code sent to user's mobile number via SMS</div>
+              <div class="inner-item">Voice call OTP — automated call reads a one-time code to the user</div>
+              <div class="inner-item">Note: if Email OTP is used as 1st factor, only SMS can serve as 2nd factor</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SOCIAL / FEDERATED IDPs -->
+        <div class="diag-section sec-social">
+          <div class="diag-section-title">Social &amp; federated identity providers</div>
+          <div class="diag-section-sub">Users sign in with an existing account at an external identity provider</div>
+          <div class="diag-cols">
+            <div class="diag-inner inner-social-wf">
+              <div class="inner-title">Social providers</div>
+              <div class="inner-item">Google — sign in with Gmail account</div>
+              <div class="inner-item">Facebook — sign in with Facebook account</div>
+              <div class="inner-item">Apple — sign in with Apple ID</div>
+              <div class="inner-item">Microsoft Account — personal Microsoft / Live account</div>
+            </div>
+            <div class="diag-inner inner-social-ex">
+              <div class="inner-title">Enterprise federation</div>
+              <div class="inner-item">Custom OIDC IdP — any OpenID Connect compliant provider</div>
+              <div class="inner-item">SAML / WS-Fed IdP — enterprise federation with domain acceleration</div>
+              <div class="inner-item">Entra ID federation — workforce Entra ID as an OIDC IdP (preview)</div>
+              <div class="inner-item">Azure AD B2C — migrate / federate via custom OIDC</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SSPR -->
+        <div class="diag-section sec-sspr">
+          <div class="diag-section-title">Self-service password reset (SSPR)</div>
+          <div class="diag-section-sub">Users reset their own password without contacting an admin — verified via a registered method</div>
+          <div class="diag-cols">
+            <div class="diag-inner inner-sspr-wf">
+              <div class="inner-title">How SSPR works</div>
+              <div class="inner-item">User clicks "Forgot password" on the sign-in page</div>
+              <div class="inner-item">Entra verifies identity using 1 or 2 registered methods</div>
+              <div class="inner-item">On success, user sets a new password immediately</div>
+              <div class="inner-item">Admins configure which methods are allowed and how many required</div>
+            </div>
+            <div class="diag-inner inner-sspr-ex">
+              <div class="inner-title">Available SSPR methods</div>
+              <div class="inner-item">Email OTP — code sent to registered email</div>
+              <div class="inner-item">SMS OTP — code sent to registered mobile number</div>
+              <div class="inner-item">Microsoft Authenticator — approve via app notification</div>
+              <div class="inner-item">Security questions — answer pre-registered questions</div>
+              <div class="inner-item">Voice call — automated call with spoken code</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CUSTOM EXTENSIBILITY STRIP -->
+        <div class="diag-export">
+          <div class="diag-export-label">Custom extensibility</div>
+          <span class="diag-export-pill">Custom Email OTP (SendGrid / ACS)</span>
+          <span class="diag-export-pill">Custom OIDC IdP</span>
+          <span class="diag-export-pill">SAML / WS-Fed domain acceleration</span>
+          <span class="diag-export-pill">Native Authentication SDK</span>
+          <span class="diag-export-pill">Custom auth extensions</span>
+        </div>
+
+      </div><!-- /diag-outer -->
+    </div><!-- /auth-coverage -->
+
+    <!-- TAB: COMPARE -->
+    <div class="panel" id="auth-compare">
+      <div class="card">
+        <div class="card-title">Authentication methods — Workforce vs External ID</div>
+        <div class="card-sub">Full matrix of method support across both tenant types</div>
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th style="width:28%">Method</th>
+              <th style="width:16%">Category</th>
+              <th style="width:28%">✓ Workforce tenant</th>
+              <th style="width:28%">Entra External ID</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="4" style="background:#1a1a2a;color:#6060a0;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 16px;">First factor — local accounts</td></tr>
+            <tr>
+              <td>Email + Password</td><td style="color:var(--text3);font-size:11px">1st factor</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Default for workforce members</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Default for local accounts</span></div></td>
+            </tr>
+            <tr>
+              <td>Email OTP (passwordless)</td><td style="color:var(--text3);font-size:11px">1st factor</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">For B2B guests and SSPR</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Fully supported as primary sign-in</span></div></td>
+            </tr>
+            <tr>
+              <td>Username / Alias sign-in</td><td style="color:var(--text3);font-size:11px">1st factor</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Supported</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-alt">~</span><span class="avail-text avail-alt">Preview — custom ID, membership number etc.</span></div></td>
+            </tr>
+            <tr>
+              <td>SMS OTP as primary login</td><td style="color:var(--text3);font-size:11px">1st factor</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Frontline workers — phone + SMS only</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available — email required as primary</span></div></td>
+            </tr>
+            <tr>
+              <td>FIDO2 / Passkeys</td><td style="color:var(--text3);font-size:11px">1st factor</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Phishing-resistant passwordless</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available</span></div></td>
+            </tr>
+            <tr>
+              <td>Temporary Access Pass (TAP)</td><td style="color:var(--text3);font-size:11px">1st factor</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Time-limited for onboarding / recovery</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available</span></div></td>
+            </tr>
+            <tr><td colspan="4" style="background:#1a1a2a;color:#6060a0;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 16px;">MFA — second factor</td></tr>
+            <tr>
+              <td>Email OTP (2nd factor)</td><td style="color:var(--text3);font-size:11px">MFA</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Supported</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Supported — unless Email OTP used as 1st factor</span></div></td>
+            </tr>
+            <tr>
+              <td>SMS OTP (2nd factor)</td><td style="color:var(--text3);font-size:11px">MFA</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Supported</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">GA March 2026 — native auth flows</span></div></td>
+            </tr>
+            <tr>
+              <td>Microsoft Authenticator</td><td style="color:var(--text3);font-size:11px">MFA</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Push notifications + TOTP</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not supported for local accounts</span></div></td>
+            </tr>
+            <tr>
+              <td>Windows Hello for Business</td><td style="color:var(--text3);font-size:11px">MFA</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Phishing-resistant, device-bound</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available</span></div></td>
+            </tr>
+            <tr>
+              <td>OATH tokens (TOTP)</td><td style="color:var(--text3);font-size:11px">MFA</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Hardware and software tokens</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available</span></div></td>
+            </tr>
+            <tr>
+              <td>Voice call OTP</td><td style="color:var(--text3);font-size:11px">MFA</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Supported</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available</span></div></td>
+            </tr>
+            <tr><td colspan="4" style="background:#1a1a2a;color:#6060a0;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 16px;">Social &amp; federated identity providers</td></tr>
+            <tr>
+              <td>Google</td><td style="color:var(--text3);font-size:11px">Social IdP</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">B2B guests</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Consumer sign-in</span></div></td>
+            </tr>
+            <tr>
+              <td>Facebook</td><td style="color:var(--text3);font-size:11px">Social IdP</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">B2B guests</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Consumer sign-in</span></div></td>
+            </tr>
+            <tr>
+              <td>Apple</td><td style="color:var(--text3);font-size:11px">Social IdP</td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available in workforce</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Supported in External ID</span></div></td>
+            </tr>
+            <tr>
+              <td>Custom OIDC IdP</td><td style="color:var(--text3);font-size:11px">Federation</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Supported</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Supported incl. Azure AD B2C federation</span></div></td>
+            </tr>
+            <tr>
+              <td>SAML / WS-Fed IdP</td><td style="color:var(--text3);font-size:11px">Federation</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Domain-based federation</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Supported with domain acceleration</span></div></td>
+            </tr>
+            <tr>
+              <td>Entra ID federation</td><td style="color:var(--text3);font-size:11px">Federation</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Cross-tenant B2B collaboration</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-alt">~</span><span class="avail-text avail-alt">Preview — via OIDC federation</span></div></td>
+            </tr>
+            <tr><td colspan="4" style="background:#1a1a2a;color:#6060a0;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 16px;">Self-service password reset (SSPR)</td></tr>
+            <tr>
+              <td>Email OTP</td><td style="color:var(--text3);font-size:11px">SSPR</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Supported</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Supported</span></div></td>
+            </tr>
+            <tr>
+              <td>SMS OTP</td><td style="color:var(--text3);font-size:11px">SSPR</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Supported</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">GA December 2025</span></div></td>
+            </tr>
+            <tr>
+              <td>Microsoft Authenticator</td><td style="color:var(--text3);font-size:11px">SSPR</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Supported</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available</span></div></td>
+            </tr>
+            <tr>
+              <td>Security questions</td><td style="color:var(--text3);font-size:11px">SSPR</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Supported</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available</span></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout callout-warn">
+        <div class="callout-icon">⚠</div>
+        <div class="callout-body">
+          <strong>External ID is primarily Email + OTP / Password based.</strong> It is a CIAM platform optimised for consumer-facing apps where device management and enterprise auth tools (Authenticator, FIDO2, WHfB) are not available. If phishing-resistant MFA is required for your external users, consider supplementing with custom authentication extensions or a third-party provider.
+        </div>
+      </div>
+    </div><!-- /auth-compare -->
+
+  </div><!-- /page-auth -->
+
+  <!-- ═══ EXTERNAL ID (EEID) PAGE ═══ -->
+  <div id="page-eeid" class="page">
+    <div class="page-head">
+      <div class="page-breadcrumb">Microsoft Entra <span>›</span> External ID</div>
+      <div class="page-title" style="display:flex;align-items:center;gap:10px;">Microsoft Entra External ID (EEID)
+        <div style="position:relative;">
+          <button class="src-trigger" onclick="toggleSources('eeid',event)">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 1h4v4M10 1L5 6M2 3H1v8h8V9"/></svg>
+            Sources
+          </button>
+          <div class="src-popover" id="src-eeid" >
+            <div class="src-popover-title">Reference docs</div>
+            <div class="src-popover-links">
+              <a href="https://learn.microsoft.com/en-us/entra/external-id/customers/overview-customers-ciam" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>External ID overview</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/external-id/customers/concept-supported-features-customers" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>Feature comparison</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/external-id/customers/concept-user-flow" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>User flows</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/external-id/customers/concept-custom-extensions" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>Custom extensions</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/identity/conditional-access/concept-conditional-access-session" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>Session controls</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/external-id/customers/concept-branding-customers" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>Branding</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/external-id/customers/concept-native-authentication" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>Native authentication</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/graph/api/resources/tokenlifetimepolicy" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>Token lifetime policy</span><span class="m-tag">M</span></a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="page-desc">Microsoft's CIAM platform for building consumer and business-customer-facing apps. Provides branded, self-service sign-up and sign-in experiences — separate from your workforce tenant. Replaces Azure AD B2C for new customers as of May 2025.</div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('eeid','coverage')">Feature coverage</button>
+      <button class="tab" onclick="switchTab('eeid','compare')">Workforce vs External ID</button>
+    </div>
+
+    <!-- TAB: FEATURE COVERAGE -->
+    <div class="panel active" id="eeid-coverage">
+      <div class="diag-outer">
+        <div class="diag-license-badge">MAU-based pricing<br>Free tier available</div>
+        <div class="diag-outer-header">
+          <div class="diag-outer-title">Microsoft Entra External ID</div>
+          <div class="diag-outer-sub">User Flows · Custom Extensions · Branding · User &amp; App Management</div>
+        </div>
+
+        <!-- USER FLOWS -->
+        <div class="diag-section sec-userflow">
+          <div class="diag-section-title">User flows</div>
+          <div class="diag-section-sub">The core mechanism — must be attached to an app for users to register and sign in</div>
+          <div class="diag-cols">
+            <div class="diag-inner inner-uf-what">
+              <div class="inner-title">What a user flow is</div>
+              <div class="inner-item">Defines the full sign-up, sign-in &amp; password reset experience</div>
+              <div class="inner-item">Must be associated with each app — no user flow = no self-service access</div>
+              <div class="inner-item">One user flow per app (same flow can be shared across multiple apps)</div>
+              <div class="inner-item">Maximum 10 user flows per external tenant</div>
+              <div class="inner-item">Configures which identity providers are available (Email, Social, OIDC)</div>
+              <div class="inner-item">Wizard-driven — no XML policies needed (unlike Azure AD B2C)</div>
+            </div>
+            <div class="diag-inner inner-uf-cap">
+              <div class="inner-title">User flow capabilities</div>
+              <div class="inner-item">Attribute collection — built-in and custom attributes at sign-up</div>
+              <div class="inner-item">Page layout customization per flow</div>
+              <div class="inner-item">Language-level string customization</div>
+              <div class="inner-item">API connectors at attribute collection steps</div>
+              <div class="inner-item">MFA enforcement via Conditional Access</div>
+              <div class="inner-item">Branding applied per flow (overrides tenant branding)</div>
+              <div class="inner-item">Supports web, SPA, mobile, and desktop app types</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- IDP CONFIGURATION PATTERN -->
+        <div class="diag-section" style="background:#1a1030;border:1.5px solid #4a2878;">
+          <div class="diag-section-title" style="color:#d0a8ff;">Identity provider configuration pattern</div>
+          <div class="diag-section-sub" style="color:#8860c0;">Recommended layering of primary and fallback IdPs within a user flow</div>
+
+          <!-- Flow diagram: 3 boxes with arrows -->
+          <div style="display:grid;grid-template-columns:1fr 32px 1fr 32px 1fr;gap:0;align-items:center;margin-bottom:14px;">
+
+            <!-- Primary IdP 1 -->
+            <div style="background:#1e0e38;border:1.5px solid #5828a0;border-radius:8px;padding:12px 14px;">
+              <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8858c8;margin-bottom:6px;">Primary IdP 1</div>
+              <div style="font-size:12px;font-weight:700;color:#c898f8;margin-bottom:6px;">Microsoft Entra ID</div>
+              <div style="font-size:10px;color:#8060b0;padding:2px 0;">Corporate / partner users</div>
+              <div style="font-size:10px;color:#8060b0;padding:2px 0;">Workforce Entra accounts</div>
+              <div style="font-size:10px;color:#8060b0;padding:2px 0;">OIDC federation (Preview)</div>
+              <div style="margin-top:8px;display:inline-block;font-size:9px;font-weight:600;padding:2px 7px;border-radius:3px;background:#a78bfa20;border:1px solid #a78bfa40;color:#a78bfa;">Preview</div>
+            </div>
+
+            <!-- Arrow -->
+            <div style="text-align:center;color:#5828a0;font-size:18px;">+</div>
+
+            <!-- Primary IdP 2 -->
+            <div style="background:#0e1e38;border:1.5px solid #205080;border-radius:8px;padding:12px 14px;">
+              <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#406898;margin-bottom:6px;">Primary IdP 2</div>
+              <div style="font-size:12px;font-weight:700;color:#70b0e8;margin-bottom:6px;">SAML / WS-Fed IdP</div>
+              <div style="font-size:10px;color:#406080;padding:2px 0;">Enterprise partners (Okta, ADFS, Ping)</div>
+              <div style="font-size:10px;color:#406080;padding:2px 0;">Domain-based routing</div>
+              <div style="font-size:10px;color:#406080;padding:2px 0;">Domain acceleration supported</div>
+              <div style="margin-top:8px;display:inline-block;font-size:9px;font-weight:600;padding:2px 7px;border-radius:3px;background:#34c97b20;border:1px solid #34c97b40;color:#34c97b;">GA</div>
+            </div>
+
+            <!-- Arrow -->
+            <div style="text-align:center;color:#205080;font-size:18px;">+</div>
+
+            <!-- Fallback -->
+            <div style="background:#0e2818;border:1.5px solid #205838;border-radius:8px;padding:12px 14px;">
+              <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#307850;margin-bottom:6px;">Fallback IdP</div>
+              <div style="font-size:12px;font-weight:700;color:#60d890;margin-bottom:6px;">Email OTP</div>
+              <div style="font-size:10px;color:#307850;padding:2px 0;">No corporate identity required</div>
+              <div style="font-size:10px;color:#307850;padding:2px 0;">Guests, contractors, new users</div>
+              <div style="font-size:10px;color:#307850;padding:2px 0;">Passwordless — code to email</div>
+              <div style="margin-top:8px;display:inline-block;font-size:9px;font-weight:600;padding:2px 7px;border-radius:3px;background:#34c97b20;border:1px solid #34c97b40;color:#34c97b;">GA</div>
+            </div>
+
+          </div>
+
+          <!-- Notes row -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px;">
+            <div style="background:#120a20;border:1px solid #38206030;border-radius:6px;padding:10px 12px;">
+              <div style="font-size:10px;font-weight:700;color:#9060d0;margin-bottom:4px;">⚠ Important — how "fallback" works</div>
+              <div style="font-size:10px;color:#6040a0;line-height:1.6;">External ID shows all enabled IdPs on the sign-in page simultaneously — there is no enforced waterfall routing. "Fallback" is achieved by enabling Email OTP alongside the primary IdPs. Users without a federated identity naturally choose OTP. To enforce routing, use custom auth extensions.</div>
+            </div>
+            <div style="background:#081810;border:1px solid #20503030;border-radius:6px;padding:10px 12px;">
+              <div style="font-size:10px;font-weight:700;color:#40a860;margin-bottom:4px;">✓ Why this pattern is recommended</div>
+              <div style="font-size:10px;color:#308048;line-height:1.6;">No password-based local accounts — reduces credential attack surface. Entra ID + SAML/WS-Fed covers corporate and partner users with existing identities. Email OTP provides a low-friction, passwordless option for everyone else without requiring account creation.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CUSTOM AUTHENTICATION EXTENSIONS -->
+        <div class="diag-section sec-ext">
+          <div class="diag-section-title">Custom authentication extensions</div>
+          <div class="diag-section-sub">Hook into the auth flow to connect external systems and add custom business logic</div>
+          <div class="diag-cols">
+            <div class="diag-inner inner-ext-hooks">
+              <div class="inner-title">Event hooks</div>
+              <div class="inner-item">OnAttributeCollectionStart — before the sign-up form renders</div>
+              <div class="inner-item">OnAttributeCollectionSubmit — after user submits sign-up form</div>
+              <div class="inner-item">TokenIssuanceStart — before token is issued to the app</div>
+              <div class="inner-item">Custom Email OTP provider — replace Microsoft's OTP email with your own</div>
+              <div class="inner-item">Each hook calls your REST API endpoint with the event payload</div>
+            </div>
+            <div class="diag-inner inner-ext-do">
+              <div class="inner-title">What you can do</div>
+              <div class="inner-item">Validate user input against external system (e.g. CRM, database)</div>
+              <div class="inner-item">Block or allow sign-up based on custom business rules</div>
+              <div class="inner-item">Enrich token claims with data from external APIs</div>
+              <div class="inner-item">Send branded OTP emails via SendGrid or Azure Communication Services</div>
+              <div class="inner-item">Pre-populate or modify attributes before account creation</div>
+              <div class="inner-item">Return block response with custom error message to user</div>
+            </div>
+          </div>
+
+          <!-- API CONNECTOR SECURITY -->
+          <div style="margin-top:12px;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6070b0;margin-bottom:8px;">Securing your API connector endpoint</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+
+              <!-- Basic auth -->
+              <div style="background:#0e1020;border:1.5px solid #283060;border-radius:8px;padding:12px 14px;">
+                <div style="font-size:11px;font-weight:700;color:#7080d0;margin-bottom:6px;">HTTP Basic auth</div>
+                <div style="font-size:10px;color:#485088;padding:2px 0;line-height:1.5;">Username + password sent in Authorization header (base64 encoded)</div>
+                <div style="font-size:10px;color:#485088;padding:2px 0;line-height:1.5;">Your API checks the values on each incoming request</div>
+                <div style="margin-top:8px;display:inline-block;font-size:9px;font-weight:600;padding:2px 7px;border-radius:3px;background:#f59e0b15;border:1px solid #f59e0b30;color:#f59e0b;">⚠ Not recommended alone in production</div>
+              </div>
+
+              <!-- Certificate auth -->
+              <div style="background:#0a1a10;border:1.5px solid #205030;border-radius:8px;padding:12px 14px;">
+                <div style="font-size:11px;font-weight:700;color:#50c070;margin-bottom:6px;">Client certificate (recommended)</div>
+                <div style="font-size:10px;color:#308048;padding:2px 0;line-height:1.5;">Upload <code style="background:#102018;padding:1px 4px;border-radius:3px;color:#60d880;">.pfx</code> certificate + password to Entra admin center</div>
+                <div style="font-size:10px;color:#308048;padding:2px 0;line-height:1.5;">Entra presents the cert on every call — mutual TLS (mTLS)</div>
+                <div style="font-size:10px;color:#308048;padding:2px 0;line-height:1.5;">Your API validates the cert to confirm call came from Entra</div>
+                <div style="font-size:10px;color:#308048;padding:2px 0;line-height:1.5;">Password protects the private key inside the <code style="background:#102018;padding:1px 4px;border-radius:3px;color:#60d880;">.pfx</code></div>
+                <div style="margin-top:8px;display:inline-block;font-size:9px;font-weight:600;padding:2px 7px;border-radius:3px;background:#34c97b20;border:1px solid #34c97b40;color:#34c97b;">✓ Recommended for production</div>
+              </div>
+
+              <!-- Operational notes -->
+              <div style="background:#0e0e18;border:1.5px solid #282838;border-radius:8px;padding:12px 14px;">
+                <div style="font-size:11px;font-weight:700;color:#8888c0;margin-bottom:6px;">Operational notes</div>
+                <div style="font-size:10px;color:#505080;padding:2px 0;line-height:1.5;">Set expiry reminder alerts — expired cert breaks all user flows using that connector</div>
+                <div style="font-size:10px;color:#505080;padding:2px 0;line-height:1.5;">Roll certificates without downtime — your API can accept old + new cert simultaneously during transition</div>
+                <div style="font-size:10px;color:#505080;padding:2px 0;line-height:1.5;">Can use Azure API Management as a validation layer in front of any API service</div>
+                <div style="font-size:10px;color:#505080;padding:2px 0;line-height:1.5;">Azure App Service &amp; Functions support mTLS natively</div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- BRANDING & EXPERIENCE -->
+        <div class="diag-section sec-brand">
+          <div class="diag-section-title">Branding &amp; experience</div>
+          <div class="diag-section-sub">Make the sign-in experience look and feel like your product</div>
+          <div class="diag-cols">
+            <div class="diag-inner inner-brand-co">
+              <div class="inner-title">Company branding</div>
+              <div class="inner-item">Background image and color</div>
+              <div class="inner-item">Company logo (header &amp; favicon)</div>
+              <div class="inner-item">Custom text and string overrides</div>
+              <div class="inner-item">Applied as default across all user flows in tenant</div>
+              <div class="inner-item">Configurable via admin center or Graph API</div>
+              <div class="inner-item">Sign-out page automatically matches sign-in branding</div>
+            </div>
+            <div class="diag-inner inner-brand-per">
+              <div class="inner-title">Per-flow &amp; advanced</div>
+              <div class="inner-item">Language-specific string customization per user flow</div>
+              <div class="inner-item">Custom URL domain — brand the login endpoint (e.g. login.yourapp.com)</div>
+              <div class="inner-item">Native Authentication SDK — full UI control for iOS &amp; Android apps</div>
+              <div class="inner-item">VS Code extension — build &amp; preview auth flows in your IDE</div>
+              <div class="inner-item">Per-flow branding overrides tenant-level branding</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- USER & APP MANAGEMENT -->
+        <div class="diag-section sec-usermgmt">
+          <div class="diag-section-title">User &amp; app management</div>
+          <div class="diag-section-sub">Managing identities and application registrations in the external tenant</div>
+          <div class="diag-cols">
+            <div class="diag-inner inner-user-acct">
+              <div class="inner-title">User accounts</div>
+              <div class="inner-item">Local accounts — email-based, created via self-service sign-up</div>
+              <div class="inner-item">Admin-created accounts (with or without admin role)</div>
+              <div class="inner-item">Guest / invited users</div>
+              <div class="inner-item">Built-in attributes — Given Name, Surname, City, Postal Code etc.</div>
+              <div class="inner-item">Custom attributes — read &amp; write via Microsoft Graph API</div>
+              <div class="inner-item">All users have default permissions unless assigned admin role</div>
+            </div>
+            <div class="diag-inner inner-app-reg">
+              <div class="inner-title">Application registration</div>
+              <div class="inner-item">Register apps directly in the external tenant</div>
+              <div class="inner-item">Each app must be associated with a user flow</div>
+              <div class="inner-item">App roles for authorization (being phased in)</div>
+              <div class="inner-item">Supports SPA, web, mobile (iOS/Android), daemon/service apps</div>
+              <div class="inner-item">MSAL SDK integration for all major platforms</div>
+              <div class="inner-item">Encryption keys for tokens, secrets &amp; certificates</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TOKEN LIFETIME & SESSION CONTROLS -->
+        <div class="diag-section" style="background:#0e1a28;border:1.5px solid #1a4060;">
+          <div class="diag-section-title" style="color:#80c8f0;">Token lifetime &amp; session controls</div>
+          <div class="diag-section-sub" style="color:#406880;">What each control does — see Workforce vs External ID tab for availability</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+
+            <div style="background:#081018;border:1.5px solid #103040;border-radius:8px;padding:12px 14px;">
+              <div style="font-size:11px;font-weight:700;color:#60b0d8;margin-bottom:6px;">Access token lifetime</div>
+              <div style="font-size:10px;color:#3a7090;line-height:1.7;">A short-lived credential your app uses to call APIs on behalf of the user. Once it expires, the app must get a new one silently using the refresh token — or prompt the user to sign in again if no refresh token is available. Setting this to 60 min means the token is valid for exactly 1 hour before it must be renewed.</div>
+            </div>
+
+            <div style="background:#081018;border:1.5px solid #103040;border-radius:8px;padding:12px 14px;">
+              <div style="font-size:11px;font-weight:700;color:#60b0d8;margin-bottom:6px;">ID token lifetime</div>
+              <div style="font-size:10px;color:#3a7090;line-height:1.7;">Tells your app who the user is — contains identity claims (name, email, user ID). Typically used at sign-in to establish the app's own session. The app reads this once; it doesn't repeatedly call APIs with it. Lifetime controls how long this identity assertion is considered valid.</div>
+            </div>
+
+            <div style="background:#081018;border:1.5px solid #103040;border-radius:8px;padding:12px 14px;">
+              <div style="font-size:11px;font-weight:700;color:#60b0d8;margin-bottom:6px;">Refresh token lifetime</div>
+              <div style="font-size:10px;color:#3a7090;line-height:1.7;">A longer-lived credential used to silently get new access tokens without asking the user to sign in again. Think of it as the "stay logged in" mechanism. When it expires, the user must fully re-authenticate. Not configurable in External ID — platform-managed.</div>
+            </div>
+
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+
+            <div style="background:#081018;border:1.5px solid #103040;border-radius:8px;padding:12px 14px;">
+              <div style="font-size:11px;font-weight:700;color:#60b0d8;margin-bottom:6px;">Refresh sliding window — Bounded</div>
+              <div style="font-size:10px;color:#3a7090;line-height:1.7;">An Azure AD B2C concept. "Bounded" means the refresh token can keep renewing itself (sliding) but only up to a maximum total duration — e.g. 90 days. After that hard limit, the user must sign in again regardless of activity. Prevents indefinite "stay logged in forever" sessions.</div>
+            </div>
+
+            <div style="background:#081018;border:1.5px solid #103040;border-radius:8px;padding:12px 14px;">
+              <div style="font-size:11px;font-weight:700;color:#60b0d8;margin-bottom:6px;">Web app session lifetime</div>
+              <div style="font-size:10px;color:#3a7090;line-height:1.7;">An Azure AD B2C concept. Controls how long the browser cookie for the B2C session lasts — independent of the token lifetime. Once the session cookie expires, the user is redirected to re-authenticate even if their access token is still valid. Not a native Entra External ID setting.</div>
+            </div>
+
+            <div style="background:#081018;border:1.5px solid #103040;border-radius:8px;padding:12px 14px;">
+              <div style="font-size:11px;font-weight:700;color:#60b0d8;margin-bottom:6px;">CA sign-in frequency</div>
+              <div style="font-size:10px;color:#3a7090;line-height:1.7;">A Conditional Access control that forces the user to actively re-authenticate after a set time (e.g. every 4 hours), even if their tokens are still valid and the refresh token hasn't expired. Adds a hard re-auth checkpoint on top of token mechanics. Supported in External ID.</div>
+            </div>
+
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+
+            <div style="background:#081018;border:1.5px solid #103040;border-radius:8px;padding:12px 14px;">
+              <div style="font-size:11px;font-weight:700;color:#60b0d8;margin-bottom:6px;">Persistent browser session</div>
+              <div style="font-size:10px;color:#3a7090;line-height:1.7;">Controls whether the user stays signed in after closing and reopening the browser. When enabled, a persistent session cookie is set — the user won't be prompted to sign in again on their next visit. When disabled, closing the browser ends the session. Supported in External ID.</div>
+            </div>
+
+            <div style="background:#081018;border:1.5px solid #103040;border-radius:8px;padding:12px 14px;">
+              <div style="font-size:11px;font-weight:700;color:#60b0d8;margin-bottom:6px;">Continuous access evaluation (CAE)</div>
+              <div style="font-size:10px;color:#3a7090;line-height:1.7;">Instead of waiting for the access token to expire, CAE allows Entra to revoke access in near real time — e.g. the moment an account is disabled or a password is changed. The resource is notified immediately and rejects the token. Not available in External ID.</div>
+            </div>
+
+            <div style="background:#081018;border:1.5px solid #103040;border-radius:8px;padding:12px 14px;">
+              <div style="font-size:11px;font-weight:700;color:#60b0d8;margin-bottom:6px;">Token protection (token binding)</div>
+              <div style="font-size:10px;color:#3a7090;line-height:1.7;">Cryptographically binds a token to the specific device it was issued to. Even if an attacker steals the token, they can't use it from a different device. Prevents token theft and replay attacks. Not available in External ID.</div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- INTEGRATIONS STRIP -->
+        <div class="diag-export">
+          <div class="diag-export-label">Integrations</div>
+          <span class="diag-export-pill">Microsoft Graph API</span>
+          <span class="diag-export-pill">Native Auth SDK (iOS / Android)</span>
+          <span class="diag-export-pill">MSAL</span>
+          <span class="diag-export-pill">Azure Communication Services</span>
+          <span class="diag-export-pill">SendGrid</span>
+          <span class="diag-export-pill">Logic Apps</span>
+          <span class="diag-export-pill">VS Code Extension</span>
+        </div>
+
+      </div><!-- /diag-outer -->
+    </div><!-- /eeid-coverage -->
+
+    <!-- TAB: COMPARE -->
+    <div class="panel" id="eeid-compare">
+      <div class="card">
+        <div class="card-title">Feature availability comparison</div>
+        <div class="card-sub">Workforce tenant (enterprise users) vs Entra External ID (customer-facing apps)</div>
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th style="width:28%">Feature</th>
+              <th style="width:36%">✓ Workforce tenant</th>
+              <th style="width:36%">Entra External ID</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="3" style="background:#1a1a2a;color:#6060a0;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 16px;">User flows &amp; sign-up</td></tr>
+            <tr>
+              <td>Self-service sign-up user flows</td>
+              <td><div class="avail"><span class="avail-icon icon-alt">~</span><span class="avail-text avail-alt">Available for B2B guests only — not for internal workforce members</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Core CIAM feature — must attach to each app. Max 10 per tenant</span></div></td>
+            </tr>
+            <tr>
+              <td>User flow attached to app (required)</td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not applicable — workforce users access apps via Entra app registration directly</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Mandatory — no user flow = no self-service access to app</span></div></td>
+            </tr>
+            <tr>
+              <td>Custom attribute collection at sign-up</td>
+              <td><div class="avail"><span class="avail-icon icon-alt">~</span><span class="avail-text avail-alt">B2B guest flows only — limited attribute collection</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Built-in + custom attributes selectable in user flow</span></div></td>
+            </tr>
+            <tr><td colspan="3" style="background:#1a1a2a;color:#6060a0;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 16px;">Custom extensions</td></tr>
+            <tr>
+              <td>OnAttributeCollectionStart / Submit</td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available in workforce tenant</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Fully supported — validate, block, or pre-populate at sign-up</span></div></td>
+            </tr>
+            <tr>
+              <td>TokenIssuanceStart extension</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Supported in workforce tenant</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Supported in external tenant too</span></div></td>
+            </tr>
+            <tr>
+              <td>Custom Email OTP provider</td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available — Microsoft sends OTP emails in workforce</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">GA — use SendGrid, ACS, or any provider for branded OTP emails</span></div></td>
+            </tr>
+            <tr><td colspan="3" style="background:#1a1a2a;color:#6060a0;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 16px;">Branding &amp; experience</td></tr>
+            <tr>
+              <td>Custom URL domain (login endpoint)</td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available — workforce uses login.microsoftonline.com</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Brand login endpoint as login.yourapp.com</span></div></td>
+            </tr>
+            <tr>
+              <td>Native Authentication SDK</td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available in workforce tenant</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Full UI control for iOS &amp; Android — no browser redirect needed</span></div></td>
+            </tr>
+            <tr>
+              <td>Company branding (logo, colors, text)</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Supported — applied to all workforce sign-in pages</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Full branding per tenant and per user flow</span></div></td>
+            </tr>
+            <tr><td colspan="3" style="background:#1a1a2a;color:#6060a0;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 16px;">User &amp; app management</td></tr>
+            <tr>
+              <td>MAU-based pricing</td>
+              <td><div class="avail"><span class="avail-icon icon-alt">~</span><span class="avail-text avail-alt">MAU pricing applies only to B2B guest users (UserType=Guest)</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Billed per monthly active user regardless of role or UserType</span></div></td>
+            </tr>
+            <tr>
+              <td>ID Protection / ID Governance</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Fully supported with P2 license</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available in external tenants</span></div></td>
+            </tr>
+            <tr>
+              <td>Azure AD B2C migration path</td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not applicable</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Recommended replacement — B2C deprecated for new customers May 2025</span></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout callout-info">
+        <div class="callout-icon">ℹ</div>
+        <div class="callout-body">
+          <strong>Key principle:</strong> External ID is a <strong>separate tenant</strong> from your workforce. Apps, users, branding, and user flows are all managed independently. Enterprise security features (ID Protection, ID Governance, PIM, device compliance) are not available — External ID is purpose-built for consumer and business-customer CIAM scenarios.
+        </div>
+      </div>
+
+      <!-- SECURITY LIMITATIONS -->
+      <div class="card" style="margin-top:16px;border-color:#602020;">
+        <div class="card-title" style="color:#f08080;">⚠ Security limitations &amp; workarounds</div>
+        <div class="card-sub">Workforce security features not available in External ID — and what to do instead</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:4px;">
+
+          <!-- Banned passwords -->
+          <div style="background:#140404;border:1.5px solid #481010;border-radius:8px;padding:12px 14px;">
+            <div style="font-size:11px;font-weight:700;color:#e06060;margin-bottom:6px;">Custom banned password list</div>
+            <div style="font-size:10px;color:#804040;line-height:1.6;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #48101030;">Not available — <code style="background:#200808;padding:1px 4px;border-radius:3px;color:#d05050;">Authentication methods → Password protection</code> is workforce-only. Global banned list still applies automatically.</div>
+            <div style="font-size:10px;font-weight:600;color:#c05050;margin-bottom:4px;">Workarounds</div>
+            <div style="font-size:10px;color:#804040;line-height:1.7;">→ <strong style="color:#c06060;">OnAttributeCollectionSubmit</strong> extension — validate against your own banned list at sign-up<br>→ Use <strong style="color:#c06060;">Email OTP</strong> as primary — no password, no policy needed<br>→ Built-in complexity still enforced (8+ chars, mixed case, number/symbol)</div>
+          </div>
+
+          <!-- ID Protection -->
+          <div style="background:#140404;border:1.5px solid #481010;border-radius:8px;padding:12px 14px;">
+            <div style="font-size:11px;font-weight:700;color:#e06060;margin-bottom:6px;">ID Protection &amp; risk detection</div>
+            <div style="font-size:10px;color:#804040;line-height:1.6;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #48101030;">Not available — sign-in risk, user risk, risk-based Conditional Access, and risky user / sign-in reports are all workforce-only.</div>
+            <div style="font-size:10px;font-weight:600;color:#c05050;margin-bottom:4px;">Workarounds</div>
+            <div style="font-size:10px;color:#804040;line-height:1.7;">→ <strong style="color:#c06060;">Akamai / Cloudflare</strong> via Microsoft Security Store for bot &amp; DDoS protection<br>→ <strong style="color:#c06060;">Custom auth extensions</strong> for risk logic at sign-up<br>→ <strong style="color:#c06060;">Sign-up fraud prevention</strong> via partner solutions</div>
+          </div>
+
+          <!-- Governance & PIM -->
+          <div style="background:#140404;border:1.5px solid #481010;border-radius:8px;padding:12px 14px;">
+            <div style="font-size:11px;font-weight:700;color:#e06060;margin-bottom:6px;">ID Governance &amp; PIM</div>
+            <div style="font-size:10px;color:#804040;line-height:1.6;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #48101030;">Not available — entitlement management, access reviews, lifecycle workflows, and privileged identity management are workforce-only.</div>
+            <div style="font-size:10px;font-weight:600;color:#c05050;margin-bottom:4px;">Workarounds</div>
+            <div style="font-size:10px;color:#804040;line-height:1.7;">→ <strong style="color:#c06060;">Workforce tenant + B2B collaboration</strong> if full governance is required<br>→ <strong style="color:#c06060;">Graph API</strong> for custom user lifecycle automation<br>→ Time-limited access via user flow expiry settings</div>
+          </div>
+
+          <!-- CAPTCHA -->
+          <div style="background:#140404;border:1.5px solid #481010;border-radius:8px;padding:12px 14px;">
+            <div style="font-size:11px;font-weight:700;color:#e06060;margin-bottom:6px;">CAPTCHA (sign-in &amp; sign-up)</div>
+            <div style="font-size:10px;color:#804040;line-height:1.6;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #48101030;">No configurable CAPTCHA setting for sign-in or sign-up flows — this was an Azure AD B2C feature (user flow Properties → CAPTCHA) and has not been carried across to External ID. The only CAPTCHA in EEID is platform-managed: automatically triggered during SMS MFA when fraud is suspected.</div>
+            <div style="font-size:10px;font-weight:600;color:#c05050;margin-bottom:4px;">Workarounds</div>
+            <div style="font-size:10px;color:#804040;line-height:1.7;">→ <strong style="color:#c06060;">OnAttributeCollectionSubmit</strong> extension — implement custom CAPTCHA (e.g. Google reCAPTCHA, hCaptcha) via your own API at sign-up<br>→ <strong style="color:#c06060;">Akamai / Cloudflare</strong> via Microsoft Security Store — bot protection &amp; WAF at network layer<br>→ <strong style="color:#c06060;">MFA enforcement</strong> — adds a human verification step, reducing bot effectiveness</div>
+          </div>
+
+          <!-- Report suspicious activity -->
+          <div style="background:#140404;border:1.5px solid #481010;border-radius:8px;padding:12px 14px;">
+            <div style="font-size:11px;font-weight:700;color:#e06060;margin-bottom:6px;">Report suspicious activity</div>
+            <div style="font-size:10px;color:#804040;line-height:1.6;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #48101030;">Generally not available in External ID. This feature is tied to <strong style="color:#c06060;">Microsoft Authenticator push notifications</strong> and <strong style="color:#c06060;">voice call MFA</strong> as the delivery channel — when a user receives an unexpected prompt, they can flag it directly in the app or via phone. Since External ID primarily uses Email OTP, SMS OTP, and passkey (FIDO2) MFA, none of which support this interaction model, the experience has no delivery mechanism in External ID.</div>
+            <div style="font-size:10px;font-weight:600;color:#c05050;margin-bottom:4px;">Exception</div>
+            <div style="font-size:10px;color:#804040;line-height:1.7;padding:6px 8px;background:#1e0808;border-radius:4px;border-left:2px solid #802020;">If users authenticate via a <strong style="color:#c06060;">federated IdP</strong> (e.g. SAML/WS-Fed enterprise IdP) that issues Authenticator-based MFA prompts upstream, the report mechanism may be available at the IdP level — but this is outside External ID's own MFA stack and not configurable within the External ID tenant.</div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- TOKEN LIFETIME COMPARISON -->
+      <div class="card" style="margin-top:16px;border-color:#184028;">
+        <div class="card-title" style="color:#50d880;">Token lifetime &amp; session controls</div>
+        <div class="card-sub">How token lifetimes and session management compare across tenant types</div>
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th style="width:28%">Feature</th>
+              <th style="width:36%">✓ Workforce tenant</th>
+              <th style="width:36%">Entra External ID</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Access token lifetime</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Configurable 10 min → 1 day via Token Lifetime Policy. Default 60–90 min (random)</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Configurable via Token Lifetime Policy — 60 min fully supported. Graph API / PowerShell only, no admin center UI</span></div></td>
+            </tr>
+            <tr>
+              <td>ID token lifetime</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Configurable via Token Lifetime Policy</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Configurable via Token Lifetime Policy</span></div></td>
+            </tr>
+            <tr>
+              <td>Refresh token lifetime</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Platform default — no longer configurable via policy. Use CA sign-in frequency to control re-auth</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Fixed, platform-managed. Inactivity timeouts and disabling not supported. Email OTP: shorter-lived; social / local: up to 90 days sliding</span></div></td>
+            </tr>
+            <tr>
+              <td>Refresh sliding window — Bounded</td>
+              <td><div class="avail"><span class="avail-icon icon-alt">~</span><span class="avail-text avail-alt">Not directly configurable in workforce Entra ID — was an Azure AD B2C concept. Use CA sign-in frequency instead</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-alt">~</span><span class="avail-text avail-alt">Partial — available for local accounts &amp; social IdPs (up to 90 days). Not available for Email OTP flows (fixed 24 hrs). No platform-wide policy — per user flow only. Note: "Bounded / No expiry" terminology is Azure AD B2C language; External ID does not expose this setting explicitly</span></div></td>
+            </tr>
+            <tr>
+              <td>CA sign-in frequency</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Forces re-authentication after a set interval — works alongside token lifetimes for layered session control</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Supported in external tenants per official Microsoft docs</span></div></td>
+            </tr>
+            <tr>
+              <td>Persistent browser session</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Configurable via CA session controls</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Supported in external tenants per official Microsoft docs</span></div></td>
+            </tr>
+            <tr>
+              <td>Web app session lifetime</td>
+              <td><div class="avail"><span class="avail-icon icon-alt">~</span><span class="avail-text avail-alt">Not a direct Entra ID setting — use CA sign-in frequency for browser session re-auth, or app-layer session management</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available as a platform setting — this is an Azure AD B2C concept. Workarounds: (1) use CA sign-in frequency (supported in EEID), (2) set access token lifetime to match desired session length, (3) manage session in app code using <code style="background:#1a1a2a;padding:1px 4px;border-radius:3px;">UseTokenLifetime=false</code> and explicit <code style="background:#1a1a2a;padding:1px 4px;border-radius:3px;">ExpiresUtc</code></span></div></td>
+            </tr>
+            <tr><td colspan="3" style="background:#1a1a2a;color:#6060a0;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 16px;">CA session controls — NOT available in External ID</td></tr>
+            <tr>
+              <td>App enforced restrictions</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Passes device info to cloud apps (SharePoint, Exchange) for limited vs full experience</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available in external tenants</span></div></td>
+            </tr>
+            <tr>
+              <td>Conditional Access App Control (MCAS)</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Real-time session monitoring via Defender for Cloud Apps reverse proxy</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available in external tenants</span></div></td>
+            </tr>
+            <tr>
+              <td>Token protection (token binding)</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Binds token to device to prevent token theft / replay attacks</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available in external tenants</span></div></td>
+            </tr>
+            <tr>
+              <td>Continuous access evaluation (CAE)</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Auto-enabled — revokes tokens in near real time on account disablement / password change</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available in external tenants</span></div></td>
+            </tr>
+            <tr>
+              <td>Resilience defaults</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Extends access to existing sessions during Entra ID outages</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available in external tenants</span></div></td>
+            </tr>
+            <tr><td colspan="3" style="background:#1a1a2a;color:#6060a0;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 16px;">Logout</td></tr>
+            <tr>
+              <td>Require ID token hint in logout</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Configurable per app — App registrations → Authentication. Enforces <code style="background:#1a1a2a;padding:1px 4px;border-radius:3px;">id_token_hint</code> must be present in logout requests</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Configurable per app — same setting, same location. Note: does not cascade logout to upstream federated IdPs automatically</span></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div><!-- /eeid-compare -->
+
+  </div><!-- /page-eeid -->
+
+  <!-- ═══ CROSS-TENANT ACCESS PAGE ═══ -->
+  <div id="page-cta" class="page">
+    <div class="page-head">
+      <div class="page-breadcrumb">Microsoft Entra <span>›</span> Cross-tenant Access</div>
+      <div class="page-title" style="display:flex;align-items:center;gap:10px;">Cross-tenant Access Settings
+        <div style="position:relative;">
+          <button class="src-trigger" onclick="toggleSources('cta',event)">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 1h4v4M10 1L5 6M2 3H1v8h8V9"/></svg>
+            Sources
+          </button>
+          <div class="src-popover" id="src-cta" >
+            <div class="src-popover-title">Reference docs</div>
+            <div class="src-popover-links">
+              <a href="https://learn.microsoft.com/en-us/entra/external-id/cross-tenant-access-overview" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>Cross-tenant access overview</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/external-id/cross-tenant-access-settings-b2b-collaboration" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>B2B collaboration settings</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/external-id/cross-tenant-access-settings-b2b-direct-connect" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>B2B direct connect</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/external-id/tenant-restrictions-v2" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>Tenant restrictions v2</span><span class="m-tag">M</span></a>
+              <a href="https://learn.microsoft.com/en-us/entra/external-id/customers/concept-supported-features-customers" target="_blank"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 1h4v4M9 1L4 6M2 3H1v6h6V7"/></svg><span>EEID feature comparison</span><span class="m-tag">M</span></a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="page-desc">Controls how your tenant collaborates with other Microsoft Entra organisations — governing inbound access (external users into your resources) and outbound access (your users into external resources). Default settings must be restricted; access granted only to approved partner tenants via organisational settings.</div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('cta','coverage')">Feature coverage</button>
+      <button class="tab" onclick="switchTab('cta','compare')">Workforce vs External ID</button>
+    </div>
+
+    <!-- TAB: FEATURE COVERAGE -->
+    <div class="panel active" id="cta-coverage">
+      <div class="diag-outer">
+        <div class="diag-license-badge">Entra ID P1<br>required</div>
+        <div class="diag-outer-header">
+          <div class="diag-outer-title">Cross-tenant Access Settings</div>
+          <div class="diag-outer-sub">Default settings · B2B Direct Connect · Trust settings · Organisational settings</div>
+        </div>
+
+        <!-- DEFAULT INBOUND & OUTBOUND -->
+        <div class="diag-section sec-cta-inout">
+          <div class="diag-section-title">Default inbound &amp; outbound settings</div>
+          <div class="diag-section-sub">Apply to ALL external Entra organisations unless overridden by an organisational setting</div>
+          <div class="diag-cols">
+            <div class="diag-inner inner-cta-in">
+              <div class="inner-title">Inbound access defaults</div>
+              <div class="inner-item">Controls which external Entra org users can access YOUR resources</div>
+              <div class="inner-item">Covers B2B collaboration (guest accounts) and B2B direct connect</div>
+              <div class="inner-item">Applies to all external orgs not listed in organisational settings</div>
+              <div class="inner-item">Includes trust settings for MFA, compliant device, hybrid join claims</div>
+              <div class="inner-item">Path: External Identities → Cross-tenant access → Default settings → Edit inbound defaults</div>
+            </div>
+            <div class="diag-inner inner-cta-out">
+              <div class="inner-title">Outbound access defaults</div>
+              <div class="inner-item">Controls which of YOUR users can access resources in external orgs</div>
+              <div class="inner-item">Covers B2B collaboration invitations and B2B direct connect</div>
+              <div class="inner-item">Can scope to specific users, groups, and applications</div>
+              <div class="inner-item">Applies to all external orgs not listed in organisational settings</div>
+              <div class="inner-item">Path: External Identities → Cross-tenant access → Default settings → Edit outbound defaults</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- B2B DIRECT CONNECT -->
+        <div class="diag-section sec-cta-b2b">
+          <div class="diag-section-title">B2B direct connect</div>
+          <div class="diag-section-sub">Allows external users to access shared resources without a guest account — blocked by default</div>
+          <div class="diag-cols">
+            <div class="diag-inner inner-cta-b2b">
+              <div class="inner-title">What B2B direct connect is</div>
+              <div class="inner-item">Enables users from external tenants to access shared channels in Teams without creating a guest account</div>
+              <div class="inner-item">User remains in their home tenant — no object created in your directory</div>
+              <div class="inner-item">Different from B2B collaboration which creates a guest (#EXT#) account</div>
+              <div class="inner-item">Requires both tenants to configure inbound/outbound settings</div>
+              <div class="inner-item">Default: Blocked for all external orgs out of the box</div>
+              <div class="inner-item">Can be enabled per approved partner tenant via Organisational settings</div>
+            </div>
+            <div class="diag-inner inner-cta-b2b">
+              <div class="inner-title">B2B collaboration vs direct connect</div>
+              <div class="inner-item">B2B collaboration — external user invited as guest, object created in your tenant, managed via access reviews</div>
+              <div class="inner-item">B2B direct connect — no guest account, user stays in home tenant, less visibility and governance</div>
+              <div class="inner-item">B2B direct connect is higher risk — no object in your directory means no Entra ID governance controls apply</div>
+              <div class="inner-item">Cross-tenant sync — different again, syncs users as members (not guests) for seamless collaboration</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TRUST SETTINGS -->
+        <div class="diag-section sec-cta-trust">
+          <div class="diag-section-title">Trust settings</div>
+          <div class="diag-section-sub">Controls whether claims from external tenants are accepted — configurable per org</div>
+          <div class="diag-cols">
+            <div class="diag-inner inner-cta-trust">
+              <div class="inner-title">Trust MFA from Entra tenants</div>
+              <div class="inner-item">Accept MFA completion claims from the user's home tenant</div>
+              <div class="inner-item">User is not re-challenged for MFA when accessing your resources</div>
+              <div class="inner-item">Risk: you are trusting another org's MFA implementation and policies</div>
+              <div class="inner-item">Disabled by default — can be enabled per partner org via Organisational settings</div>
+            </div>
+            <div class="diag-inner inner-cta-trust">
+              <div class="inner-title">Trust compliant &amp; hybrid joined devices</div>
+              <div class="inner-item">Trust compliant device — accept Intune device compliance from external tenant</div>
+              <div class="inner-item">Trust hybrid Entra joined — accept hybrid join claims from external tenant's AD</div>
+              <div class="inner-item">Risk: device compliance standards may differ between organisations</div>
+              <div class="inner-item">Disabled by default — can be enabled per partner org via Organisational settings</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ORGANISATIONAL SETTINGS -->
+        <div class="diag-section sec-cta-org">
+          <div class="diag-section-title">Organisational settings</div>
+          <div class="diag-section-sub">Override defaults for specific partner tenants — granular per-org control</div>
+          <div class="diag-cols">
+            <div class="diag-inner inner-cta-org">
+              <div class="inner-title">How to add a partner org</div>
+              <div class="inner-item">Add org by domain name or tenant ID</div>
+              <div class="inner-item">Configure inbound / outbound access independently per org</div>
+              <div class="inner-item">Enable B2B direct connect only for that specific org</div>
+              <div class="inner-item">Enable MFA / device trust only for that specific org</div>
+              <div class="inner-item">Org settings take precedence over default settings</div>
+              <div class="inner-item">No limit on number of orgs you can add</div>
+            </div>
+            <div class="diag-inner inner-cta-org">
+              <div class="inner-title">Governance &amp; review</div>
+              <div class="inner-item">Regularly review which orgs are in Organisational settings</div>
+              <div class="inner-item">Remove stale partner orgs that no longer require access</div>
+              <div class="inner-item">Use sign-in logs to identify which external orgs users currently access</div>
+              <div class="inner-item">Align with quarterly access review cadence for privileged roles</div>
+              <div class="inner-item">Graph API available for programmatic management of cross-tenant settings</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PATH STRIP -->
+        <div class="diag-export">
+          <div class="diag-export-label">Admin path</div>
+          <span class="diag-export-pill">External Identities → Cross-tenant access settings</span>
+          <span class="diag-export-pill">Default settings tab</span>
+          <span class="diag-export-pill">Organisational settings tab</span>
+          <span class="diag-export-pill">Graph API</span>
+          <span class="diag-export-pill">Tenant restrictions v2</span>
+        </div>
+
+      </div><!-- /diag-outer -->
+    </div><!-- /cta-coverage -->
+
+    <!-- TAB: COMPARE -->
+    <div class="panel" id="cta-compare">
+      <div class="card">
+        <div class="card-title">Feature availability comparison</div>
+        <div class="card-sub">Workforce tenant (enterprise users) vs Entra External ID (customer-facing apps)</div>
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th style="width:30%">Feature</th>
+              <th style="width:35%">✓ Workforce tenant</th>
+              <th style="width:35%">✗ Entra External ID</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="3" style="background:#1a1a2a;color:#6060a0;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 16px;">Default settings</td></tr>
+            <tr>
+              <td>Restrict default inbound access</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Configurable — block all external orgs by default, allow only approved partners via org settings</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available — cross-tenant access settings are a workforce tenant feature only per official Microsoft docs</span></div></td>
+            </tr>
+            <tr>
+              <td>Restrict default outbound access</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Configurable — block users from accessing all external orgs by default</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available in external tenants</span></div></td>
+            </tr>
+            <tr><td colspan="3" style="background:#1a1a2a;color:#6060a0;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 16px;">B2B direct connect</td></tr>
+            <tr>
+              <td>B2B direct connect (default)</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Blocked by default ✓ — must remain blocked; enable only per approved org via org settings</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available in external tenants — B2B direct connect is workforce only</span></div></td>
+            </tr>
+            <tr>
+              <td>B2B direct connect per approved partner</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Enable per org via Organisational settings — Teams shared channels use case</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available in external tenants</span></div></td>
+            </tr>
+            <tr><td colspan="3" style="background:#1a1a2a;color:#6060a0;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 16px;">Trust settings</td></tr>
+            <tr>
+              <td>Trust MFA from Entra tenants</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Disabled by default — enable only for trusted, validated partner tenants via org settings</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available in external tenants</span></div></td>
+            </tr>
+            <tr>
+              <td>Trust compliant devices</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Disabled by default — enable only for partners with verified device management standards</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available in external tenants</span></div></td>
+            </tr>
+            <tr>
+              <td>Trust hybrid Entra joined devices</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Disabled by default — enable only per validated partner</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available in external tenants</span></div></td>
+            </tr>
+            <tr><td colspan="3" style="background:#1a1a2a;color:#6060a0;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 16px;">Organisational settings</td></tr>
+            <tr>
+              <td>Per-org override settings</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Add org by domain or tenant ID — override inbound, outbound, direct connect, trust per partner</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available in external tenants</span></div></td>
+            </tr>
+            <tr>
+              <td>Tenant restrictions v2</td>
+              <td><div class="avail"><span class="avail-icon icon-yes">✓</span><span class="avail-text">Controls external accounts accessing external apps on your managed devices</span></div></td>
+              <td><div class="avail"><span class="avail-icon icon-no">✗</span><span class="avail-text">Not available in external tenants</span></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout callout-warn">
+        <div class="callout-icon">⚠</div>
+        <div class="callout-body">
+          <strong>External ID scope:</strong> Cross-tenant access settings (B2B collaboration, B2B direct connect, trust settings) apply to <strong>workforce tenants only</strong> per official Microsoft documentation. The requirement to restrict default inbound/outbound access and disable B2B direct connect by default applies to your <strong>workforce tenant</strong> — not the External ID external tenant. External ID external tenants manage consumer/customer access through user flows, not cross-tenant B2B mechanisms.
+        </div>
+      </div>
+    </div><!-- /cta-compare -->
+
+  </div><!-- /page-cta -->
+
+</main>
+</div>
+
+<script>
+const STORAGE_KEY = 'entra-review-flags';
+const ADMIN_HASH = 'b67a6b8f64a5400c659aa1fabb949ce5d4fce8a4eb3f337426002b17b1eb124c';
+const CHECK_SVG = '<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="9" fill="#34c97b20" stroke="#34c97b" stroke-width="1.5"/><path d="M6 10l3 3 5-5" stroke="#34c97b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const VERIFIED_TOOLTIP = 'Verified for EEID · Workforce tenant is best estimate';
+
+function loadFlags() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch(e) { return {}; } }
+function saveFlags(flags) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(flags)); } catch(e) {} }
+
+// ── PIN functions ──
+async function hashPIN(pin) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pin));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+function openPIN() {
+  document.getElementById('pin-overlay').classList.add('open');
+  document.getElementById('pin-input').value = '';
+  document.getElementById('pin-error').style.display = 'none';
+  setTimeout(() => document.getElementById('pin-input').focus(), 100);
+}
+function closePIN() {
+  document.getElementById('pin-overlay').classList.remove('open');
+}
+async function submitPIN() {
+  const pin = document.getElementById('pin-input').value;
+  const hash = await hashPIN(pin);
+  if (hash === ADMIN_HASH) {
+    document.body.classList.add('admin-unlocked');
+    document.getElementById('admin-btn').innerHTML = '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="8" height="6" rx="1"/><path d="M4 5V3a2 2 0 014 0v2"/></svg> Admin ✓';
+    closePIN();
+    updateCount();
+  } else {
+    document.getElementById('pin-error').style.display = 'block';
+    document.getElementById('pin-input').value = '';
+    document.getElementById('pin-input').focus();
+  }
+}
+
+// Map page IDs to short display names
+const PAGE_NAMES = {
+  'page-idp': 'ID Protection',
+  'page-gov': 'ID Governance',
+  'page-ca': 'Conditional Access',
+  'page-auth': 'Auth Methods',
+  'page-eeid': 'External ID',
+  'page-cta': 'Cross-tenant Access'
+};
+
+function getPageName(el) {
+  const page = el.closest('[id^="page-"]');
+  return page ? (PAGE_NAMES[page.id] || page.id) : '';
+}
+
+function injectReviewButtons() {
+  const flags = loadFlags();
+  // ── Section boxes ──
+  const boxes = document.querySelectorAll('.diag-inner,.inner-cta-in,.inner-cta-out,.inner-cta-b2b,.inner-cta-trust,.inner-cta-org,.inner-uf-what,.inner-uf-cap,.inner-ext-hooks,.inner-ext-do,.inner-brand-co,.inner-brand-per,.inner-user-acct,.inner-app-reg,.inner-local-wf,.inner-local-ex,.inner-mfa-wf,.inner-mfa-ex,.inner-social-wf,.inner-social-ex,.inner-sspr-wf,.inner-sspr-ex,.inner-hr,.inner-lc,.inner-ent,.inner-rev,.inner-pim,.inner-sod');
+  boxes.forEach((box, i) => {
+    if (box.querySelector('.review-btn')) return;
+    const id = 'box-' + i;
+    box.dataset.reviewId = id;
+    const sectionTitle = box.querySelector('.inner-title')?.textContent?.trim() || 'Section ' + i;
+    const pageName = getPageName(box);
+    box.dataset.reviewTitle = sectionTitle;
+    box.dataset.reviewPage = pageName;
+    box.dataset.reviewType = 'box';
+    const btn = document.createElement('button');
+    btn.className = 'review-btn'; btn.innerHTML = '⚑'; btn.title = 'Flag for review';
+    btn.onclick = e => { e.stopPropagation(); cycleState(id); };
+    box.insertBefore(btn, box.firstChild);
+    const badge = document.createElement('span');
+    badge.className = 'verified-badge';
+    badge.innerHTML = CHECK_SVG;
+    badge.title = VERIFIED_TOOLTIP;
+    box.appendChild(badge);
+    applyBoxState(box, flags[id] || 'none');
+  });
+
+  // ── Table rows ──
+  document.querySelectorAll('.compare-table tbody tr').forEach((row, i) => {
+    if (row.querySelector('.row-review-btn')) return;
+    if (row.querySelector('td[colspan]')) return;
+    const id = 'row-' + i;
+    row.dataset.reviewId = id;
+    const rowTitle = row.querySelector('td:first-child')?.textContent?.trim()?.slice(0,50) || 'Row ' + i;
+    const pageName = getPageName(row);
+    row.dataset.reviewTitle = rowTitle;
+    row.dataset.reviewPage = pageName;
+    row.dataset.reviewType = 'row';
+    const td = row.querySelector('td:first-child');
+    if (!td) return;
+    const wrap = document.createElement('span');
+    wrap.style.cssText = 'display:inline-flex;align-items:center;gap:4px;';
+    wrap.innerHTML = td.innerHTML;
+    td.innerHTML = '';
+    td.appendChild(wrap);
+    const btn = document.createElement('button');
+    btn.className = 'row-review-btn'; btn.innerHTML = '⚑'; btn.title = 'Flag for review';
+    btn.onclick = e => { e.stopPropagation(); cycleState(id); };
+    const icon = document.createElement('span');
+    icon.className = 'row-verified-icon';
+    icon.innerHTML = CHECK_SVG;
+    icon.title = VERIFIED_TOOLTIP;
+    wrap.appendChild(btn);
+    wrap.appendChild(icon);
+    applyRowState(row, flags[id] || 'none');
+  });
+
+  updateReviewPanel();
+  updateCount();
+}
+
+function cycleState(id) {
+  const flags = loadFlags();
+  const cur = flags[id] || 'none';
+  const next = cur === 'none' ? 'flagged' : cur === 'flagged' ? 'verified' : 'none';
+  if (next === 'none') delete flags[id]; else flags[id] = next;
+  saveFlags(flags);
+  const el = document.querySelector('[data-review-id="' + id + '"]');
+  if (!el) return;
+  if (el.dataset.reviewType === 'row') applyRowState(el, next);
+  else applyBoxState(el, next);
+  updateReviewPanel();
+  updateCount();
+}
+
+function applyBoxState(box, state) {
+  const btn = box.querySelector('.review-btn');
+  box.classList.remove('is-flagged','is-verified');
+  if (btn) { btn.classList.remove('flagged','verified'); }
+  if (state === 'flagged') { box.classList.add('is-flagged'); if(btn){btn.classList.add('flagged');btn.innerHTML='⚑';btn.title='Click to verify';} }
+  else if (state === 'verified') { box.classList.add('is-verified'); if(btn){btn.classList.add('verified');btn.innerHTML=CHECK_SVG;btn.title='Click to clear';} }
+  else { if(btn){btn.innerHTML='⚑';btn.title='Flag for review';} }
+}
+
+function applyRowState(row, state) {
+  const btn = row.querySelector('.row-review-btn');
+  row.classList.remove('row-is-flagged','row-is-verified');
+  if (btn) btn.classList.remove('flagged','verified');
+  if (state === 'flagged') { row.classList.add('row-is-flagged'); if(btn){btn.classList.add('flagged');btn.innerHTML='⚑';btn.title='Click to verify';} }
+  else if (state === 'verified') { row.classList.add('row-is-verified'); if(btn){btn.classList.add('verified');btn.innerHTML='';btn.title='Click to clear';} }
+  else { if(btn){btn.innerHTML='⚑';btn.title='Flag for review';} }
+}
+
+function updateReviewPanel() {
+  const flags = loadFlags();
+  const body = document.getElementById('review-panel-body');
+  const empty = document.getElementById('review-empty');
+  const flagged = [], verified = [];
+  Object.entries(flags).forEach(([id, state]) => {
+    const el = document.querySelector('[data-review-id="' + id + '"]');
+    if (!el) return;
+    const title = el.dataset.reviewTitle || id;
+    const page = el.dataset.reviewPage || '';
+    const label = page
+      ? '<strong>' + page + '</strong>' + title
+      : title;
+    if (state === 'flagged') flagged.push({id, label});
+    if (state === 'verified') verified.push({id, label});
+  });
+  body.querySelectorAll('.review-section').forEach(s => s.remove());
+  if (!flagged.length && !verified.length) { empty.style.display='block'; return; }
+  empty.style.display='none';
+  if (flagged.length) {
+    const sec = document.createElement('div'); sec.className='review-section';
+    sec.innerHTML='<div class="review-section-label flagged-label">⚑ Flagged ('+flagged.length+')</div>';
+    flagged.forEach(({id,label}) => {
+      const item = document.createElement('div'); item.className='review-item';
+      item.innerHTML='<span>'+label+'</span><button class="review-item-clear" onclick="clearFlag(\''+id+'\')">✕</button>';
+      sec.appendChild(item);
+    });
+    body.appendChild(sec);
+  }
+  if (verified.length) {
+    const sec = document.createElement('div'); sec.className='review-section';
+    sec.innerHTML='<div class="review-section-label verified-label">✓ Verified ('+verified.length+')</div>';
+    verified.forEach(({id,label}) => {
+      const item = document.createElement('div'); item.className='review-item';
+      item.innerHTML='<span>'+label+'</span><button class="review-item-clear" onclick="clearFlag(\''+id+'\')">✕</button>';
+      sec.appendChild(item);
+    });
+    body.appendChild(sec);
+  }
+}
+
+function clearFlag(id) {
+  const flags = loadFlags(); delete flags[id]; saveFlags(flags);
+  const el = document.querySelector('[data-review-id="'+id+'"]');
+  if (el) { if(el.dataset.reviewType==='row') applyRowState(el,'none'); else applyBoxState(el,'none'); }
+  updateReviewPanel(); updateCount();
+}
+
+function updateCount() {
+  const flags = loadFlags();
+  const count = Object.values(flags).filter(s=>s==='flagged').length;
+  const el = document.getElementById('review-count');
+  el.textContent = count;
+  el.classList.toggle('visible', count > 0);
+}
+
+function toggleReviewPanel() { document.getElementById('review-panel').classList.toggle('open'); }
+
+function switchTab(page, tab) {
+  document.querySelectorAll('#page-'+page+' .tab').forEach((t,i) => {
+    t.classList.toggle('active',(i===0&&tab==='coverage')||(i===1&&tab==='compare'));
+  });
+  document.getElementById(page+'-coverage').classList.toggle('active',tab==='coverage');
+  document.getElementById(page+'-compare').classList.toggle('active',tab==='compare');
+}
+function selectPage(el, pageId) {
+  document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+pageId).classList.add('active');
+  document.querySelectorAll('.src-popover').forEach(p=>p.classList.remove('open'));
+}
+function toggleSources(id,event) {
+  event.stopPropagation();
+  const pop = document.getElementById('src-'+id);
+  const open = pop.classList.contains('open');
+  document.querySelectorAll('.src-popover').forEach(p=>p.classList.remove('open'));
+  if (!open) pop.classList.add('open');
+}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.src-popover')&&!e.target.closest('.src-trigger'))
+    document.querySelectorAll('.src-popover').forEach(p=>p.classList.remove('open'));
+});
+
+document.addEventListener('DOMContentLoaded', injectReviewButtons);
+</script>
+
+</body>
+</html>
